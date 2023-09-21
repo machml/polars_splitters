@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "random-split"
+version = "0.1.0"
+description = ""
+authors = ["Jonas M. Miguel <Jonas M. Miguel>"]
+readme = "README.md"
+packages = [{include = "random_split"}]
+
+[tool.poetry.dependencies]
+python = "^3.11.4"
+numpy = "^1.26.0"
+pandas = "^2.1.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
