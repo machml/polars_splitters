@@ -1,6 +1,9 @@
-import polars as pl
 import math
-from typing import List, Tuple, Dict, Union
+from typing import Dict, List, Tuple, Union
+
+import polars as pl
+
+# pl.set_random_seed(25)  # TODO: remove this
 
 
 def split_train_eval(
@@ -38,14 +41,10 @@ def split_train_val_test(
         raise ValueError(f"Sum of fracs must be 1, but got {sum(fracs)}")
 
     test_frac = fracs[-1]
-    df_train_e_val, df_test = split_train_eval(
-        df, test_frac, stratify_by, lazy=True, seed=seed
-    )
+    df_train_e_val, df_test = split_train_eval(df, test_frac, stratify_by, lazy=True, seed=seed)
 
     val_frac = fracs[1] / (fracs[0] + fracs[1])
-    df_train, df_val = split_train_eval(
-        df_train_e_val, val_frac, stratify_by, lazy=True, seed=seed
-    )
+    df_train, df_val = split_train_eval(df_train_e_val, val_frac, stratify_by, lazy=True, seed=seed)
 
     if isinstance(df, pl.LazyFrame) and not lazy:
         return df_train.collect(), df_val.collect(), df_test.collect()
@@ -76,12 +75,10 @@ def get_k_folds(
     folds = {i: {"train": None, "eval": None} for i in range(k)}
     for i in range(k):
         is_eval = (fold_size * i <= idxs) & (idxs < fold_size * (i + 1))
-        folds[i] = {"train": df_lazy.filter(~is_eval), "eval": df_lazy.filter(is_eval)}
 
-    if not lazy:
-        folds = {
-            i: {"train": fold["train"].collect(), "eval": fold["eval"].collect()}
-            for i, fold in folds.items()
-        }
+        if lazy:
+            folds[i] = {"train": df_lazy.filter(~is_eval), "eval": df_lazy.filter(is_eval)}
+        else:
+            folds[i] = {"train": df_lazy.filter(~is_eval).collect(), "eval": df_lazy.filter(is_eval).collect()}
 
     return folds
