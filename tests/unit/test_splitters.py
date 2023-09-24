@@ -61,6 +61,29 @@ class TestGetKFolds:
                 "outcome": [pair_values[1] for pair_values in treatment_outcome_pairs],
             }
         )
+        if from_lazy:
+            return df_lazy
+        else:
+            return df_lazy.collect()
+
+    return _df
+
+
+class TestSplitIntoSubsets:
+    @pytest.mark.parametrize("from_lazy", [False, True])
+    @pytest.mark.parametrize("rel_sizes", [(0.5, 0.1, 0.1), {"train": 0.5, "val": 0.1, "test": 0.1}])
+    def test_handling_rel_sizes_not_summing_to_one(self, df, from_lazy, rel_sizes):
+        with check.raises(ValueError):
+            split_into_subsets(df=df(from_lazy), rel_sizes=rel_sizes)
+
+    @pytest.mark.parametrize("from_lazy", [False, True])
+    @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
+    def test_case_df_to_dfs(self, df, from_lazy, rel_sizes):
+        subsets = split_into_subsets(df(from_lazy), rel_sizes=rel_sizes)
+        check.equal(len(subsets), 3)
+        check.equal(len(subsets[0]), 7)
+        check.equal(len(subsets[1]), 2)
+        check.equal(len(subsets[2]), 1)
 
     @pytest.fixture
     def df(self, df_lazy) -> pl.DataFrame:
