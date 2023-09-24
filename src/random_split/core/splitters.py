@@ -258,7 +258,7 @@ def split_into_subsets(
     """Split a dataset into non-overlapping len(rel_sizes) subsets."""
     rel_sizes_ = rel_sizes
     if isinstance(rel_sizes, tuple):
-        rel_sizes_ = {f"subset_{i}": rel_size for i, rel_size in enumerate(rel_sizes)}
+        rel_sizes_ = {f"subset_{i}": fraction for i, fraction in enumerate(rel_sizes)}
 
     df_lazy = df.lazy()
 
@@ -266,9 +266,12 @@ def split_into_subsets(
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
 
-    sizes = {subset: (rel_size * pl.count()).floor().cast(pl.Int64) for subset, rel_size in rel_sizes.items()}
+    sizes = {subset: (rel_size * pl.count()).floor().cast(pl.Int64) for subset, rel_size in rel_sizes_.items()}
 
     if stratify_by:
+        if isinstance(stratify_by, str):
+            stratify_by = [stratify_by]
+
         idxs = idxs.over(stratify_by)
         sizes = {k: v.over(stratify_by) for k, v in sizes.items()}
 
@@ -281,10 +284,10 @@ def split_into_subsets(
     if not as_lazy:
         subsets = {k: v.collect() for k, v in subsets.items()}
 
-    if not as_dict:
-        return tuple(subsets.values())
-    else:
+    if isinstance(rel_sizes, dict) and as_dict:
         return subsets
+    else:
+        return tuple(subsets.values())
 
 
 def split_into_k_folds(
