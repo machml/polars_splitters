@@ -78,16 +78,71 @@ class TestSplitIntoSubsets:
 
     @pytest.mark.parametrize("from_lazy", [False, True])
     @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
-    def test_case_df_to_dfs(self, df, from_lazy, rel_sizes):
+    def test_as_tuples(self, df, from_lazy, rel_sizes):
         subsets = split_into_subsets(df(from_lazy), rel_sizes=rel_sizes)
         check.equal(len(subsets), 3)
         check.equal(len(subsets[0]), 7)
         check.equal(len(subsets[1]), 2)
         check.equal(len(subsets[2]), 1)
 
-    @pytest.fixture
-    def df(self, df_lazy) -> pl.DataFrame:
-        return df_lazy.collect()
+    @pytest.mark.parametrize("from_lazy", [False, True])
+    @pytest.mark.parametrize("shuffle", [False, True])
+    @pytest.mark.parametrize("as_dict", [False, True])
+    @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
+    def test_to_df(self, df, from_lazy, rel_sizes, shuffle, as_dict):
+        subsets = split_into_subsets(df=df(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle, as_dict=as_dict)
+
+        if isinstance(rel_sizes, dict) and as_dict:
+            check.equal(len(subsets), 3)
+            check.equal(len(subsets["train"]), 7)
+            check.equal(len(subsets["val"]), 2)
+            check.equal(len(subsets["test"]), 1)
+        else:
+            check.equal(len(subsets[0]), 7)
+            check.equal(len(subsets[1]), 2)
+            check.equal(len(subsets[2]), 1)
+
+    @pytest.mark.parametrize("from_lazy", [False, True])
+    @pytest.mark.parametrize("shuffle", [False, True])
+    @pytest.mark.parametrize("as_dict", [False, True])
+    @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
+    def test_to_lazy_df(self, df, from_lazy, rel_sizes, shuffle, as_dict):
+        subsets = split_into_subsets(
+            df=df(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle, as_dict=as_dict, as_lazy=True
+        )
+
+        if isinstance(rel_sizes, dict) and as_dict:
+            for subset in subsets.values():
+                check.is_instance(subset, pl.LazyFrame)
+            check.equal(len(subsets), 3)
+            check.equal(len(subsets["train"].collect()), 7)
+            check.equal(len(subsets["val"].collect()), 2)
+            check.equal(len(subsets["test"].collect()), 1)
+        else:
+            for subset in subsets:
+                check.is_instance(subset, pl.LazyFrame)
+            check.equal(len(subsets[0].collect()), 7)
+            check.equal(len(subsets[1].collect()), 2)
+            check.equal(len(subsets[2].collect()), 1)
+
+    @pytest.mark.parametrize("from_lazy", [False])
+    @pytest.mark.parametrize("shuffle", [False, True])
+    @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
+    def test_shuffle(self, df, from_lazy, rel_sizes, shuffle):
+        subsets = split_into_subsets(df=df(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle)
+
+        df_ = df(from_lazy)
+        if from_lazy:
+            df_ = df_.collect()
+
+        if shuffle:
+            check.is_true(~subsets[0].frame_equal(df_[0:7]))
+            check.is_true(~subsets[1].frame_equal(df_[7:9]))
+            check.is_true(~subsets[2].frame_equal(df_[9]))
+        else:
+            check.is_true(subsets[0].frame_equal(df_[0:7]))
+            check.is_true(subsets[1].frame_equal(df_[7:9]))
+            check.is_true(subsets[2].frame_equal(df_[9]))
 
     @pytest.fixture
     def folds(self, df, k, stratify_by, lazy, shuffle):
