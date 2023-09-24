@@ -1,4 +1,5 @@
 import math
+from functools import wraps
 from typing import Dict, List, Literal, Tuple, Union, overload
 
 import polars as pl
@@ -7,202 +8,41 @@ df_pl = pl.DataFrame | pl.LazyFrame
 eval_set_name = Literal["val", "test"]
 
 
-@overload
-def _split(
-    k: Literal[None],
-    as_dict: Literal[False],
-    as_lazy: Literal[True],
-    *args,
-    **kwargs,
-) -> Tuple[pl.LazyFrame]:
-    ...
+def validate_rel_sizes(func):
+    """Assumes that rel_sizes is the second argument of the function."""
 
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        rel_sizes_ = kwargs.get("rel_sizes", None)
+        if rel_sizes_ is None:
+            rel_sizes_ = args[1] if args else None
 
-@overload
-def _split(
-    k: Literal[None],
-    as_dict: Literal[False],
-    as_lazy: Literal[False],
-    *args,
-    **kwargs,
-) -> Tuple[pl.DataFrame]:
-    ...
+        if isinstance(rel_sizes_, dict):
+            rel_sizes_ = tuple(rel_sizes_.values())
 
+        # sum should be 1
+        if not math.isclose(sum(rel_sizes_), 1.0, abs_tol=1e-6):
+            raise ValueError("rel_sizes must sum to 1")
 
-@overload
-def _split(
-    eval_frac: Literal[None],
-    fracs: Literal[None],
-    as_dict: Literal[False],
-    as_lazy: Literal[True],
-    *args,
-    **kwargs,
-) -> List[Tuple[pl.LazyFrame]]:
-    # k-fold use cases
-    ...
+        # all values should be non-negative
+        if any(rel_size < 0 for rel_size in rel_sizes_):
+            raise ValueError("rel_sizes must be non-negative")
 
+        # all values should be less than 1
+        if any(rel_size > 1 for rel_size in rel_sizes_):
+            raise ValueError("rel_sizes must be less than 1")
 
-@overload
-def _split(
-    eval_frac: Literal[None],
-    fracs: Literal[None],
-    as_dict: Literal[True],
-    as_lazy: Literal[True],
-    *args,
-    **kwargs,
-) -> List[Dict[eval_set_name, pl.LazyFrame]]:
-    # k-fold use cases
-    ...
+        # rel_sizes should be of type Tuple[float], Dict[Any, float]
+        if not isinstance(rel_sizes_, (tuple, dict)):
+            raise TypeError("rel_sizes must be of type Tuple[float], Dict[Any, float]")
+        if isinstance(rel_sizes_, tuple) and not all(isinstance(rel_size, float) for rel_size in rel_sizes_):
+            raise TypeError("rel_sizes must be of type Tuple[float], Dict[Any, float]")
+        if isinstance(rel_sizes_, dict) and not all(isinstance(rel_size, float) for rel_size in rel_sizes_.values()):
+            raise TypeError("rel_sizes must be of type Tuple[float], Dict[Any, float]")
 
+        return func(*args, **kwargs)
 
-@overload
-def _split(
-    eval_frac: Literal[None],
-    fracs: Literal[None],
-    as_dict: Literal[False],
-    as_lazy: Literal[False],
-    *args,
-    **kwargs,
-) -> List[Tuple[pl.DataFrame]]:
-    # k-fold use cases
-    ...
-
-
-@overload
-def _split(
-    eval_frac: Literal[None],
-    fracs: Literal[None],
-    as_dict: Literal[True],
-    as_lazy: Literal[False],
-    *args,
-    **kwargs,
-) -> List[Dict[eval_set_name, pl.DataFrame]]:
-    # k-fold use cases
-    ...
-
-
-def _split(
-    df: df_pl,
-    eval_frac: float,
-    fracs: Tuple[float, float, float],
-    k: int,
-    stratify_by: List[str] = None,
-    shuffle: bool = True,
-    as_dict: bool = True,
-    as_lazy: bool = False,
-    seed: int = 25,
-) -> Tuple[df_pl] | List[Tuple[df_pl]] | List[Dict[eval_set_name, df_pl]]:
-    """Split Polar dataframes into subparts.
-    A generic split function that abstracts split_into_train_eval, split_into_train_val_test, and split_into_k_folds.
-    """
-    df_lazy = df.lazy()
-
-    idxs = pl.int_range(0, pl.count())
-    if shuffle:
-        idxs = idxs.shuffle(seed=seed)
-
-    if k:  # k-fold split
-        size = {"eval": pl.count() // k}
-    elif eval_frac:  # train/eval split
-        size = {"eval": (eval_frac * pl.count()).floor().cast(pl.Int64)}
-    elif fracs:  # train/val/test split
-        size = {
-            "val": (fracs[-1] * pl.count()).floor().cast(pl.Int64),
-            "test": (fracs[1] / (fracs[0] + fracs[1]) * pl.count()).floor().cast(pl.Int64),
-        }
-    else:
-        raise ValueError("Must specify either k, eval_frac, or fracs")
-
-    if stratify_by:
-        idxs = idxs.over(stratify_by)
-        size = {k: v.over(stratify_by) for k, v in size.items()}
-
-    if not k:
-        k = 1
-
-    folds = [{"train": None} for i in range(k)]
-    for fold in folds:
-        for j, subset in enumerate(size.keys()):
-            is_subset = (size[subset] * j <= idxs) & (idxs < size[subset] * (j + 1))
-            fold[subset] = df_lazy.filter(is_subset) if as_lazy else df_lazy.filter(is_subset).collect()
-            fold["train"] = df_lazy.filter(~is_subset) if as_lazy else df_lazy.filter(~is_subset).collect()
-
-    if not as_lazy:
-        ....collect()
-
-    return ...
-
-
-def split_into_train_eval(
-    df: df_pl,
-    eval_frac: float,
-    stratify_by: List[str] = None,
-    shuffle: bool = True,
-    as_dict: bool = True,
-    as_lazy: bool = False,
-    seed: int = 25,
-) -> Tuple[df_pl, df_pl]:
-    fracs = (1 - eval_frac, 0, eval_frac)
-    df_train, _, df_eval = split_into_train_val_test(df, fracs, stratify_by, shuffle, as_dict, as_lazy, seed)
-
-    return df_train, df_eval
-
-
-@overload
-def split_into_train_val_test(
-    as_dict: Literal[False],
-    as_lazy: Literal[True],
-    *args,
-    **kwargs,
-) -> Tuple[pl.LazyFrame, pl.LazyFrame, pl.LazyFrame]:
-    ...
-
-
-def split_into_train_val_test(
-    df: df_pl,
-    fracs: Tuple[float, float, float],
-    stratify_by: List[str] = None,
-    shuffle: bool = True,
-    as_dict: bool = True,
-    as_lazy: bool = False,
-    seed: int = 25,
-) -> Tuple[df_pl, df_pl, df_pl]:
-    if not math.isclose(sum(fracs), 1.0, abs_tol=1e-6):
-        raise ValueError(f"Sum of fracs must be 1, but got {sum(fracs)}")
-
-    df_lazy = df.lazy()
-
-    idxs = pl.int_range(0, pl.count())
-    if shuffle:
-        idxs = idxs.shuffle(seed=seed)
-
-    size = {
-        "train": (fracs[0] * pl.count()).floor().cast(pl.Int64),
-        "val": (fracs[1] * pl.count()).floor().cast(pl.Int64),
-        "test": (fracs[2] * pl.count()).floor().cast(pl.Int64),
-    }
-
-    if stratify_by:
-        idxs = idxs.over(stratify_by)
-        size = {k: v.over(stratify_by) for k, v in size.items()}
-
-    is_train = idxs <= size["train"]
-    is_val = (size["train"] < idxs) & (idxs <= size["train"] + size["val"])
-    is_test = (size["train"] + size["val"] < idxs) & (idxs <= size["train"] + size["val"] + size["test"])
-
-    subsets = {"train": df_lazy.filter(is_train), "test": df_lazy.filter(is_test)}
-    if fracs[1] == 0:
-        subsets["val"] = None
-    else:
-        subsets["val"] = df_lazy.filter(is_val)
-
-    if not as_lazy:
-        subsets = {k: v.collect() for k, v in subsets.items()}
-
-    if not as_dict:
-        return subsets["train"], subsets["val"], subsets["test"]
-    else:
-        return subsets
+    return wrapper
 
 
 @overload
@@ -275,7 +115,8 @@ def split_into_subsets(
         idxs = idxs.over(stratify_by)
         sizes = {k: v.over(stratify_by) for k, v in sizes.items()}
 
-    subsets = {subset: None for subset in sizes.keys()}
+    sizes = {k: v for k, v in sizes.items() if v > 0}
+    subsets = {subset: None for subset in sizes.keys() if sizes[subset] > 0}
     for i, subset in enumerate(subsets.keys()):
         sizes_already_used = sum(list(sizes.values())[:i])
         is_subset = (sizes_already_used <= idxs) & (idxs < sizes_already_used + sizes[subset])
@@ -288,6 +129,126 @@ def split_into_subsets(
         return subsets
     else:
         return tuple(subsets.values())
+
+
+@overload
+def split_into_train_val_test(
+    as_dict: Literal[True],
+    as_lazy: Literal[True],
+    *args,
+    **kwargs,
+) -> Dict[str, pl.LazyFrame]:
+    ...
+
+
+@overload
+def split_into_train_val_test(
+    as_dict: Literal[True],
+    as_lazy: Literal[False],
+    *args,
+    **kwargs,
+) -> Dict[str, pl.DataFrame]:
+    ...
+
+
+@overload
+def split_into_train_val_test(
+    as_dict: Literal[False],
+    as_lazy: Literal[False],
+    *args,
+    **kwargs,
+) -> Tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    ...
+
+
+@overload
+def split_into_train_val_test(
+    as_dict: Literal[False],
+    as_lazy: Literal[True],
+    *args,
+    **kwargs,
+) -> Tuple[pl.LazyFrame, pl.LazyFrame, pl.LazyFrame]:
+    ...
+
+
+@validate_rel_sizes
+def split_into_train_val_test(
+    df: df_pl,
+    rel_sizes: Tuple[float, float, float],
+    stratify_by: List[str] = None,
+    shuffle: bool = True,
+    as_dict: bool = False,
+    as_lazy: bool = False,
+    seed: int = 273,
+) -> Tuple[df_pl, df_pl, df_pl] | Dict[str, df_pl]:
+    if len(rel_sizes) != 3:
+        raise ValueError("rel_sizes must be a tuple of length 3")
+
+    subsets = split_into_subsets(df, rel_sizes, stratify_by, shuffle, as_dict=False, as_lazy=as_lazy, seed=seed)
+    if as_dict:
+        return {k: v for k, v in zip(("train", "val", "test"), subsets)}
+    else:
+        return subsets
+
+
+@overload
+def split_into_train_eval(
+    as_dict: Literal[True],
+    as_lazy: Literal[True],
+    *args,
+    **kwargs,
+) -> Dict[str, pl.LazyFrame]:
+    ...
+
+
+@overload
+def split_into_train_eval(
+    as_dict: Literal[True],
+    as_lazy: Literal[False],
+    *args,
+    **kwargs,
+) -> Dict[str, pl.DataFrame]:
+    ...
+
+
+@overload
+def split_into_train_eval(
+    as_dict: Literal[False],
+    as_lazy: Literal[False],
+    *args,
+    **kwargs,
+) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    ...
+
+
+@overload
+def split_into_train_eval(
+    as_dict: Literal[False],
+    as_lazy: Literal[True],
+    *args,
+    **kwargs,
+) -> Tuple[pl.LazyFrame, pl.LazyFrame]:
+    ...
+
+
+def split_into_train_eval(
+    df: df_pl,
+    eval_fraction: float,
+    stratify_by: List[str] = None,
+    shuffle: bool = True,
+    as_dict: bool = False,
+    as_lazy: bool = False,
+    seed: int = 273,
+) -> Tuple[df_pl, df_pl] | Dict[str, df_pl]:
+    if not 0 < eval_fraction < 1:
+        raise ValueError("eval_fraction must be between 0 and 1")
+
+    rel_sizes = (1 - eval_fraction, eval_fraction)
+    subsets = split_into_subsets(df, rel_sizes, stratify_by, shuffle, as_dict=False, as_lazy=as_lazy, seed=seed)
+    if as_dict:
+        return {k: v for k, v in zip(("train", "eval"), subsets)}
+    else:
+        return subsets
 
 
 def split_into_k_folds(
@@ -325,3 +286,4 @@ def split_into_k_folds(
 
 get_k_folds = split_into_k_folds
 train_test_split = split_into_train_eval
+train_val_test_split = split_into_train_val_test
