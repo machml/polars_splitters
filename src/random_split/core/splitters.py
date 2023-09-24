@@ -205,6 +205,47 @@ def split_into_train_val_test(
         return subsets
 
 
+@overload
+def split_into_subsets(
+    as_dict: Literal[True],
+    as_lazy: Literal[True],
+    *args,
+    **kwargs,
+) -> Dict[eval_set_name, pl.LazyFrame]:
+    ...
+
+
+@overload
+def split_into_subsets(
+    as_dict: Literal[True],
+    as_lazy: Literal[False],
+    *args,
+    **kwargs,
+) -> Dict[eval_set_name, pl.DataFrame]:
+    ...
+
+
+@overload
+def split_into_subsets(
+    as_dict: Literal[False],
+    as_lazy: Literal[True],
+    *args,
+    **kwargs,
+) -> Dict[eval_set_name, pl.LazyFrame]:
+    ...
+
+
+@overload
+def split_into_subsets(
+    as_dict: Literal[False],
+    as_lazy: Literal[False],
+    *args,
+    **kwargs,
+) -> Tuple[pl.DataFrame, ...]:
+    ...
+
+
+@validate_rel_sizes
 def split_into_subsets(
     df: df_pl,
     rel_sizes: Tuple[float, ...] | Dict[str, float],
@@ -212,15 +253,12 @@ def split_into_subsets(
     shuffle: bool = True,
     as_dict: bool = False,
     as_lazy: bool = False,
-    seed: int = 149,
+    seed: int = 273,
 ) -> Tuple[df_pl, ...] | Dict[str, df_pl]:
-    """Split a dataset into non-overlapping len(ren_sizes) subsets."""
+    """Split a dataset into non-overlapping len(rel_sizes) subsets."""
+    rel_sizes_ = rel_sizes
     if isinstance(rel_sizes, tuple):
-        rel_sizes = {f"subset_{i}": rel_size for i, rel_size in enumerate(rel_sizes)}
-
-    rel_sizes_sum_to_1 = math.isclose(sum(rel_sizes.values()), 1.0, abs_tol=1e-6)
-    if not rel_sizes_sum_to_1:
-        raise ValueError(f"Sum of rel_sizes must be 1, but got {sum(rel_sizes.values())}")
+        rel_sizes_ = {f"subset_{i}": rel_size for i, rel_size in enumerate(rel_sizes)}
 
     df_lazy = df.lazy()
 
