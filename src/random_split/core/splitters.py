@@ -109,6 +109,11 @@ def split_into_subsets(
     sizes = {subset: (rel_size * pl.count()).floor().cast(pl.Int64) for subset, rel_size in rel_sizes_.items()}
 
     if stratify_by:
+        if any([dtype in (pl.Float64, pl.Float32) for dtype in df_lazy.select(stratify_by).dtypes]):
+            raise NotImplementedError(
+                "Stratification by a float column is not currently supported. "
+                "Consider discretizing the column or using a different column."
+            )
         if isinstance(stratify_by, str):
             stratify_by = [stratify_by]
 
@@ -294,6 +299,12 @@ def split_into_k_folds(
     seed: int = 273,
 ) -> Dict[eval_set_name, Union[pl.DataFrame, pl.LazyFrame]]:
     df_lazy = df.lazy()
+
+    if stratify_by and any([dtype in (pl.Float64, pl.Float32) for dtype in df_lazy.select(stratify_by).dtypes]):
+        raise NotImplementedError(
+            "Stratification by a float column is not currently supported. "
+            "Consider discretizing the column or using a different column."
+        )
 
     folds = [{"train": None, "eval": None} for i in range(k)]
     for i in range(k):
