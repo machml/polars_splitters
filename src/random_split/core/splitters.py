@@ -9,7 +9,7 @@ eval_set_name = Literal["val", "test"]
 
 
 def validate_rel_sizes(func):
-    """Assumes that rel_sizes is the second argument of the function."""
+    """Assumes that rel_sizes is the second argument of the function being wrapped."""
 
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -115,8 +115,8 @@ def split_into_subsets(
         idxs = idxs.over(stratify_by)
         sizes = {k: v.over(stratify_by) for k, v in sizes.items()}
 
-    sizes = {k: v for k, v in sizes.items() if v > 0}
-    subsets = {subset: None for subset in sizes.keys() if sizes[subset] > 0}
+    sizes = {k: v for k, v in sizes.items()}
+    subsets = {subset: None for subset in sizes.keys()}
     for i, subset in enumerate(subsets.keys()):
         sizes_already_used = sum(list(sizes.values())[:i])
         is_subset = (sizes_already_used <= idxs) & (idxs < sizes_already_used + sizes[subset])
@@ -251,14 +251,14 @@ def split_into_train_eval(
         return subsets
 
 
-def split_into_k_folds(
+def split_into_k_folds_old(
     df: Union[pl.DataFrame, pl.LazyFrame],
     k: int,
     stratify_by: Union[str, List[str]] = None,
     shuffle: bool = True,
     as_dict: bool = True,
     as_lazy: bool = True,
-    seed: int = 25,
+    seed: int = 273,
 ) -> Dict[eval_set_name, Union[pl.DataFrame, pl.LazyFrame]]:
     df_lazy = df.lazy()
 
@@ -284,6 +284,31 @@ def split_into_k_folds(
     return folds
 
 
+def split_into_k_folds(
+    df: Union[pl.DataFrame, pl.LazyFrame],
+    k: int,
+    stratify_by: Union[str, List[str]] = None,
+    shuffle: bool = True,
+    as_dict: bool = True,
+    as_lazy: bool = False,
+    seed: int = 273,
+) -> Dict[eval_set_name, Union[pl.DataFrame, pl.LazyFrame]]:
+    df_lazy = df.lazy()
+
+    folds = [{"train": None, "eval": None} for i in range(k)]
+    for i in range(k):
+        folds[i] = split_into_train_eval(
+            df_lazy, 1 / k, stratify_by=stratify_by, shuffle=shuffle, as_dict=True, as_lazy=as_lazy, seed=seed
+        )
+
+    return folds
+
+
+def k_fold(df: df_pl, k: int, shuffle: bool = True, seed: int = 273):
+    return split_into_k_folds(df, k, stratify_by=None, shuffle=shuffle, as_dict=False, as_lazy=False, seed=seed)
+
+
 get_k_folds = split_into_k_folds
+stratified_k_fold = split_into_k_folds
 train_test_split = split_into_train_eval
 train_val_test_split = split_into_train_val_test
