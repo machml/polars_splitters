@@ -4,7 +4,7 @@ import polars as pl
 import pytest
 from pytest_check import check
 
-from src.random_split.core.splitters import (
+from polars_splitters.core.splitters import (
     split_into_k_folds,
     split_into_subsets,
     split_into_train_eval,
