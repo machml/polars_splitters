@@ -3,7 +3,9 @@ from typing import Callable
 import polars as pl
 import pytest
 
-from tests.utils.data_generators import get_uniformly_distributed_combinations_of_two_bools
+from tests.utils.data_generators import (
+    get_uniformly_distributed_combinations_of_two_bools,
+)
 
 
 @pytest.fixture
@@ -19,7 +21,8 @@ def df_ubools():
                 "treatment": [pair_values[0] for pair_values in treatment_outcome_pairs],
                 "outcome": [pair_values[1] for pair_values in treatment_outcome_pairs],
             }
-        )
+        ).with_columns([(pl.col("row") * 10.0).alias("feature_1"), (pl.col("row") * 100.0).alias("feature_2")])
+
         if from_lazy:
             return df_lazy
         else:

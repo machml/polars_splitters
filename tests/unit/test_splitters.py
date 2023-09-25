@@ -175,6 +175,16 @@ class TestSplitIntoSubsets:
         else:
             pass
 
+    def test_stratification_on_non_discrete_vars(self, df_ubools):
+        with check.raises(NotImplementedError):
+            split_into_subsets(
+                df=df_ubools(n=16),
+                rel_sizes={"train": 0.7, "val": 0.2, "test": 0.1},
+                stratify_by=["treatment", "feature_2"],
+                as_dict=True,
+                shuffle=False,
+            )
+
 
 class TestSplitIntoTrainEval:
     def test_basic(self, df_basic):
@@ -222,7 +232,7 @@ def test_split_into_train_val_test(df_basic):
 
 
 class TestSplitIntoKFolds:
-    def test_basic(self, df_basic):
+    def test_basic_as_dict(self, df_basic):
         k = 5
         folds = split_into_k_folds(df=df_basic(), k=k)
         check.equal(len(folds), k)
@@ -230,6 +240,16 @@ class TestSplitIntoKFolds:
         for i in range(k):
             check.equal(len(folds[i]["train"]), 8)
             check.equal(len(folds[i]["eval"]), 2)
+
+    def test_basic_as_tuple(self, df_basic):
+        k = 5
+        folds = split_into_k_folds(df=df_basic(), k=k, as_dict=False)
+        check.equal(len(folds), k)
+
+        for i in range(k):
+            df_train, df_eval = folds[i]
+            check.equal(len(df_train), 8)
+            check.equal(len(df_eval), 2)
 
     def test_stratification_on_single_var(self, df_ubools):
         k = 5
@@ -267,4 +287,14 @@ class TestSplitIntoKFolds:
             check.equal(
                 Counter(zip(folds[i]["eval"]["treatment"], folds[i]["eval"]["outcome"])),
                 Counter({(0, 1): 20, (1, 0): 20, (1, 1): 20, (0, 0): 20}),
+            )
+
+    def test_stratification_on_non_discrete_vars(self, df_ubools):
+        with check.raises(NotImplementedError):
+            split_into_k_folds(
+                df=df_ubools(n=16),
+                k=3,
+                stratify_by=["treatment", "feature_2"],
+                as_dict=True,
+                shuffle=False,
             )
