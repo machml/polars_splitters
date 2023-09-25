@@ -312,7 +312,10 @@ def split_into_k_folds(
             df_lazy, 1 / k, stratify_by=stratify_by, shuffle=shuffle, as_dict=True, as_lazy=as_lazy, seed=seed
         )
 
-    return folds
+    if as_dict:
+        return folds
+    else:
+        return [tuple(fold.values()) for fold in folds]
 
 
 def k_fold(df: df_pl, k: int, shuffle: bool = True, seed: int = 273):
