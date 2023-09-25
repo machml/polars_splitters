@@ -12,6 +12,12 @@ numpy = "^1.26.0"
 pandas = "^2.1.1"
 ipykernel = "^6.25.2"
 polars = "^0.19.3"
+pytest = "^7.4.2"
+pytest-check = "^2.2.2"
+tqdm = "^4.66.1"
+pydantic = "^2.3.0"
+pytest-profiling = "^1.7.0"
+pydocstyle = "^6.3.0"
 
 
 [build-system]

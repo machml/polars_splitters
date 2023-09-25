@@ -51,6 +51,10 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Profilers
+*.prof
+prof/*
+
 # Translations
 *.mo
 *.pot
@@ -109,6 +113,9 @@ ENV/
 env.bak/
 venv.bak/
 
+# Poetry
+poetry.lock
+
 # Spyder project settings
 .spyderproject
 .spyproject
@@ -143,3 +150,6 @@ cython_debug/
 
 # Local History for Visual Studio Code
 .history/
+
+# MacOs
+.DS_Store
