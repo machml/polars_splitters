@@ -95,7 +95,29 @@ def split_into_subsets(
     as_lazy: bool = False,
     seed: int = 273,
 ) -> Tuple[df_pl, ...] | Dict[str, df_pl]:
-    """Split a dataset into non-overlapping len(rel_sizes) subsets."""
+    """Split a dataset into non-overlapping len(rel_sizes) subsets.
+
+    Args:
+        df (polars.DataFrame or polars.LazyFrame): The DataFrame to split.
+        rel_sizes (tuple or dict): The relative sizes of the subsets. If a tuple, the sizes are interpreted as proportions
+            of the total number of rows. If a dictionary, the keys are the names of the subsets and the values are the
+            relative sizes. It must sum to 1.
+        stratify_by (list of str, optional): The column names to use for stratification. If None (default), stratification is not
+            performed. Note: Stratification by continuously-valued columns (float) is not currently supported.
+        shuffle (bool, optional): Whether to shuffle the rows before splitting. Defaults to True.
+        as_dict (bool, optional): Whether to return the subsets as a dictionary with the subset names as keys. Defaults
+            to False.
+        as_lazy (bool, optional): Whether to return the subsets as lazy DataFrames. Defaults to False.
+        seed (int, optional): The random seed to use for shuffling. Defaults to 273.
+
+    Returns:
+        tuple or dict: The subsets as DataFrames. If `as_dict` is True, the subsets are returned as a dictionary with
+            the subset names as keys.
+
+    Raises:
+        ValueError: If `rel_sizes` does not sum to one.
+        NotImplementedError: If any column in `stratify_by` is of type float.
+    """
     rel_sizes_ = rel_sizes
     if isinstance(rel_sizes, tuple):
         rel_sizes_ = {f"subset_{i}": fraction for i, fraction in enumerate(rel_sizes)}
@@ -186,6 +208,29 @@ def split_into_train_val_test(
     as_lazy: bool = False,
     seed: int = 273,
 ) -> Tuple[df_pl, df_pl, df_pl] | Dict[str, df_pl]:
+    """Split a dataset into non-overlapping train, validation, and test sets. Allows for stratification by a column or list of columns.
+
+    This is a specific case of `split_into_subsets` in which the `rel_sizes` are limited to 3 and are interpreted as `(train_fraction, val_fraction, test_fraction)`.
+
+    Args:
+        df (polars.DataFrame or polars.LazyFrame): The DataFrame to split.
+        rel_sizes (tuple): A tuple of 3 fractions representing the relative sizes of the subsets train, validation and test, respectively. The fractions must sum to 1.
+        stratify_by (list of str, optional): The column names to use for stratification. If None (default), stratification is not
+            performed. Note: Stratification by continuously-valued columns (float) is not currently supported.
+        shuffle (bool, optional): Whether to shuffle the rows before splitting. Defaults to True.
+        as_dict (bool, optional): Whether to return the subsets as a dictionary with the subset names as keys. Defaults
+            to False.
+        as_lazy (bool, optional): Whether to return the subsets as lazy DataFrames. Defaults to False.
+        seed (int, optional): The random seed to use for shuffling. Defaults to 273.
+
+    Returns:
+        tuple or dict: The subsets as DataFrames. If `as_dict` is True, the subsets are returned as a dictionary with
+            the subset names as keys.
+
+    Raises:
+        ValueError: If `rel_sizes` does not sum to one.
+        NotImplementedError: If any column in `stratify_by` is of type float, which is not currently supported.
+    """
     if len(rel_sizes) != 3:
         raise ValueError("rel_sizes must be a tuple of length 3")
 
@@ -245,6 +290,28 @@ def split_into_train_eval(
     as_lazy: bool = False,
     seed: int = 273,
 ) -> Tuple[df_pl, df_pl] | Dict[str, df_pl]:
+    """Split a dataset into non-overlapping train and eval sets. Allows for stratification by a column or list of columns.
+
+    This is a specific case of `split_into_subsets` in which the `rel_sizes` represent`(train_fraction, eval_fraction)`, with train_fraction = 1 - eval_fraction.
+
+    Args:
+        df (polars.DataFrame or polars.LazyFrame): The DataFrame to split.
+        eval_fraction (float): A decimal representing the relative size of the evaluation subset.
+        stratify_by (list of str, optional): The column names to use for stratification. If None (default), stratification is not
+            performed. Note: Stratification by continuously-valued columns (float) is not currently supported.
+        shuffle (bool, optional): Whether to shuffle the rows before splitting. Defaults to True.
+        as_dict (bool, optional): Whether to return the subsets as a dictionary with the subset names as keys. Defaults
+            to False.
+        as_lazy (bool, optional): Whether to return the subsets as lazy DataFrames. Defaults to False.
+        seed (int, optional): The random seed to use for shuffling. Defaults to 273.
+
+    Returns:
+        tuple or dict: The subsets as DataFrames. If `as_dict` is True, the subsets are returned as a dictionary with
+            the subset names as keys.
+
+    Raises:
+        NotImplementedError: If any column in `stratify_by` is of type float, which is not currently supported.
+    """
     if not 0 < eval_fraction < 1:
         raise ValueError("eval_fraction must be between 0 and 1")
 
@@ -256,39 +323,6 @@ def split_into_train_eval(
         return subsets
 
 
-def split_into_k_folds_old(
-    df: Union[pl.DataFrame, pl.LazyFrame],
-    k: int,
-    stratify_by: Union[str, List[str]] = None,
-    shuffle: bool = True,
-    as_dict: bool = True,
-    as_lazy: bool = True,
-    seed: int = 273,
-) -> Dict[eval_set_name, Union[pl.DataFrame, pl.LazyFrame]]:
-    df_lazy = df.lazy()
-
-    fold_size = pl.count() // k
-    idxs = pl.int_range(0, pl.count())
-
-    if shuffle:
-        idxs = idxs.shuffle(seed=seed)
-
-    if stratify_by:
-        fold_size = fold_size.over(stratify_by)
-        idxs = idxs.over(stratify_by)
-
-    folds = {i: {"train": None, "eval": None} for i in range(k)}
-    for i in range(k):
-        is_eval = (fold_size * i <= idxs) & (idxs < fold_size * (i + 1))
-
-        if as_lazy:
-            folds[i] = {"train": df_lazy.filter(~is_eval), "eval": df_lazy.filter(is_eval)}
-        else:
-            folds[i] = {"train": df_lazy.filter(~is_eval).collect(), "eval": df_lazy.filter(is_eval).collect()}
-
-    return folds
-
-
 def split_into_k_folds(
     df: Union[pl.DataFrame, pl.LazyFrame],
     k: int,
@@ -297,7 +331,39 @@ def split_into_k_folds(
     as_dict: bool = True,
     as_lazy: bool = False,
     seed: int = 273,
-) -> Dict[eval_set_name, Union[pl.DataFrame, pl.LazyFrame]]:
+) -> Tuple[df_pl, df_pl] | Dict[eval_set_name, df_pl]:
+    """Split a DataFrame or LazyFrame into k non-overlapping folds.
+    Allows for stratification by a column or list of columns.
+    If a single column is provided, all folds will have the same proportion of that column's values between train and eval sets.
+    If a list of columns is provided, all folds will have the same proportion of combinations of those columns' values between train and eval sets.
+
+    Notes:
+    - Stratification by continuously-valued columns (float) is not currently supported.
+    - All k folds have the same sizes for the train and eval sets. However, len(df) % k rows will never appear in the eval sets. This is usually negligible for most use cases, since typically (len(df) % k) / len(df) << 1.0.
+
+
+    Args:
+        df (polars.DataFrame or polars.LazyFrame): The DataFrame to split.
+        k (int): The number of folds to create.
+        stratify_by (str or list of str, optional): A column or list of columns to stratify the folds by.
+        shuffle (bool, optional): Whether to shuffle the data before (stratifying and) splitting. Defaults to True.
+        as_dict (bool, optional): Whether to return the folds as a list of dictionaries of the form
+            {"train": ..., "eval": ...} (as_dict=True) or as a list of tuples (df_train, df_eval). Defaults to False.
+        as_lazy (bool, optional): Whether to return the folds as pl.LazyFrames or pl.DataFrames. Defaults to False.
+        seed (int, optional): The random seed to use for shuffling. Defaults to None.
+
+    Returns:
+        A dictionary of folds, where the keys are the names of the evaluation sets
+        (e.g. "train", "valid", "test") and the values are the corresponding
+        DataFrames or LazyFrames.
+
+    Raises:
+        ValueError: If k is less than 2.
+        NotImplementedError: If any column in stratify_by is of type float.
+    """
+    if k < 2:
+        raise ValueError("k must be greater than 1")
+
     df_lazy = df.lazy()
 
     if stratify_by and any([dtype in (pl.Float64, pl.Float32) for dtype in df_lazy.select(stratify_by).dtypes]):
