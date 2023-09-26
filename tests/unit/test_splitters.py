@@ -4,9 +4,9 @@ import polars as pl
 import pytest
 from pytest_check import check
 
-from polars_splitters.core.splitters import (
+from polars_splitters.splitters import (
+    _split_into_subsets,
     split_into_k_folds,
-    split_into_subsets,
     split_into_train_eval,
     split_into_train_val_test,
     validate_rel_sizes,
@@ -54,12 +54,12 @@ class TestSplitIntoSubsets:
     @pytest.mark.parametrize("rel_sizes", [(0.5, 0.1, 0.1), {"train": 0.5, "val": 0.1, "test": 0.1}])
     def test_handling_rel_sizes_not_summing_to_one(self, df_basic, from_lazy, rel_sizes):
         with check.raises(ValueError):
-            split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes)
+            _split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes)
 
     @pytest.mark.parametrize("from_lazy", [False, True])
     @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
     def test_as_tuples(self, df_basic, from_lazy, rel_sizes):
-        subsets = split_into_subsets(df_basic(from_lazy), rel_sizes=rel_sizes)
+        subsets = _split_into_subsets(df_basic(from_lazy), rel_sizes=rel_sizes)
         check.equal(len(subsets), 3)
         check.equal(len(subsets[0]), 7)
         check.equal(len(subsets[1]), 2)
@@ -70,7 +70,7 @@ class TestSplitIntoSubsets:
     @pytest.mark.parametrize("as_dict", [False, True])
     @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
     def test_to_df(self, df_basic, from_lazy, rel_sizes, shuffle, as_dict):
-        subsets = split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle, as_dict=as_dict)
+        subsets = _split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle, as_dict=as_dict)
 
         if isinstance(rel_sizes, dict) and as_dict:
             check.equal(len(subsets), 3)
@@ -87,7 +87,7 @@ class TestSplitIntoSubsets:
     @pytest.mark.parametrize("as_dict", [False, True])
     @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
     def test_to_lazy_df(self, df_basic, from_lazy, rel_sizes, shuffle, as_dict):
-        subsets = split_into_subsets(
+        subsets = _split_into_subsets(
             df=df_basic(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle, as_dict=as_dict, as_lazy=True
         )
 
@@ -109,7 +109,7 @@ class TestSplitIntoSubsets:
     @pytest.mark.parametrize("shuffle", [False, True])
     @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
     def test_shuffle(self, df_basic, from_lazy, rel_sizes, shuffle):
-        subsets = split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle)
+        subsets = _split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle)
 
         df_ = df_basic(from_lazy)
         if from_lazy:
@@ -145,7 +145,7 @@ class TestSplitIntoSubsets:
     def test_stratification(
         self, df_ubools, from_lazy, stratify_by, strata_counts_train, strata_counts_val, strata_counts_test
     ):
-        subsets = split_into_subsets(
+        subsets = _split_into_subsets(
             df=df_ubools(from_lazy=from_lazy, n=400),
             rel_sizes={"train": 0.7, "val": 0.2, "test": 0.1},
             stratify_by=stratify_by,
@@ -177,7 +177,7 @@ class TestSplitIntoSubsets:
 
     def test_stratification_on_non_discrete_vars(self, df_ubools):
         with check.raises(NotImplementedError):
-            split_into_subsets(
+            _split_into_subsets(
                 df=df_ubools(n=16),
                 rel_sizes={"train": 0.7, "val": 0.2, "test": 0.1},
                 stratify_by=["treatment", "feature_2"],
