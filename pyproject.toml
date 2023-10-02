@@ -9,6 +9,7 @@ packages = [{ include = "polars_splitters" }]
 [tool.poetry.dependencies]
 python = ">3.9, <4.0"
 polars = "^0.19.3"
+loguru = "^0.7.2"
 
 
 [build-system]

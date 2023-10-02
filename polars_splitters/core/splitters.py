@@ -1,16 +1,17 @@
-from typing import Dict, List, Tuple, Union, overload
+from typing import Dict, List, Optional, Tuple, Union
 
 from loguru import logger
-from polars import FLOAT_DTYPES, DataFrame, Int64, LazyFrame, count, int_range
-from polars import selectors as cs
+from polars import DataFrame, Int64, LazyFrame, count, int_range
 
-from polars_splitters.utils.type_enforcers import enforce_type
+from polars_splitters.utils.validators import validate_splitting_train_eval
 
 df_pl = DataFrame | LazyFrame
 
 __all__ = [
     "split_into_train_eval",
     "split_into_k_folds",
+    "stratified_k_fold",
+    "train_test_split",
 ]
 
 
@@ -34,18 +35,19 @@ def get_lazyframe_size(df: LazyFrame) -> int:
 
 
 @logger.catch
+@validate_splitting_train_eval
 def split_into_train_eval(
     df_lazy: LazyFrame | DataFrame,
     eval_rel_size: float,
-    stratify_by: str | List[str] = None,
-    shuffle: bool = True,
-    seed: int = 273,
-    validate: bool = True,
-    rel_size_deviation_tolerance: float = 0.1,
+    stratify_by: Optional[str | List[str]] = None,
+    shuffle: Optional[bool] = True,
+    seed: Optional[int] = 273,
+    validate: Optional[bool] = True,
+    rel_size_deviation_tolerance: Optional[float] = 0.1,
 ) -> Tuple[LazyFrame, LazyFrame]:
     r"""
     Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
-    It is a wrapper around _split_into_train_eval, containing additional type coercion for the inputs, as well as validation for the inputs and outputs.
+    It is a wrapper around _split_into_train_eval including some guardrails: type coercion for the inputs, validation for the inputs and outputs.
 
     Parameters
     ----------
@@ -62,7 +64,9 @@ def split_into_train_eval(
     validate : bool, optional. Defaults to True.
         _description_
     rel_size_deviation_tolerance : float, optional. Defaults to 0.1.
-        _description_
+        Sets the maximum allowed abs(eval_rel_size_actual - eval_rel_size).
+        When stratifying, the eval_rel_size_actual might deviate from eval_rel_size due to the fact that strata for the given data may not be perfectly divisible at the desired proportion (1-eval_rel_size, eval_rel_size).
+
 
     Returns
     -------
@@ -83,7 +87,7 @@ def split_into_train_eval(
     >>> from polars_splitters.core.splitters import split_into_train_eval
     >>> df = pl.DataFrame(
     ...     {
-    ...         "feature_1": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    ...         "feature_1": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
     ...         "treatment": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
     ...         "outcome":   [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
     ...     }
@@ -100,7 +104,7 @@ def split_into_train_eval(
     │ 3.0       ┆ 0         ┆ 0       │
     │ 4.0       ┆ 0         ┆ 0       │
     │ 5.0       ┆ 0         ┆ 0       │
-    │ 6.0       ┆ 1         ┆ 0       │
+    │ 7.0       ┆ 1         ┆ 0       │
     │ 8.0       ┆ 1         ┆ 0       │
     │ 9.0       ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
@@ -112,84 +116,17 @@ def split_into_train_eval(
     │ f64       ┆ i64       ┆ i64     │
     ╞═══════════╪═══════════╪═════════╡
     │ 2.0       ┆ 0         ┆ 0       │
-    │ 7.0       ┆ 1         ┆ 0       │
+    │ 6.0       ┆ 1         ┆ 0       │
     │ 10.0      ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
     """
-    # type coercion
-    df_lazy = df_lazy.lazy()
-    stratify_by = enforce_type(stratify_by, list)
+    df_lazy = df_lazy.lazy()  # ensure LazyFrame
 
-    if validate:
-        validate_eval_rel_size_setting(eval_rel_size)
-
-        if stratify_by:
-            # validate stratification dtypes
-            stratification_columns_of_float_type = df_lazy.select(stratify_by).select(cs.by_dtype(FLOAT_DTYPES)).schema
-            if stratification_columns_of_float_type:
-                raise NotImplementedError(
-                    f"""
-                    Attempted to stratify based on float column(s): {stratification_columns_of_float_type}.
-                    This is not currently supported. Consider discretizing the column first or using a different column.
-                    """
-                )
-
-            # validate stratification feasibility (size_input, eval_rel_size, n_strata, stratify_by)
-            input_size = get_lazyframe_size(df_lazy)
-            eval_size = df_lazy.select((eval_rel_size * count()).floor().clip_min(1).cast(Int64)).collect().item()
-            if eval_rel_size <= 0.5:
-                smallest_set, smallest_set_size = ("eval", eval_size)
-            else:
-                smallest_set, smallest_set_size = ("train", input_size - eval_size)
-
-            n_strata = df_lazy.select(stratify_by).collect().n_unique()
-            logger.debug(
-                f"input_size: {input_size}, eval_size: {eval_size}, (input_size - eval_size): {input_size - eval_size}"
-            )
-            logger.debug(
-                f"smallest_set: {smallest_set}, smallest_set_size: {smallest_set_size}, n_strata: {n_strata}, stratify_by: {stratify_by}"
-            )
-            if smallest_set_size < n_strata:
-                f"""
-                Unable to generate the data splits for the data df and the configuration attempted for eval_rel_size and stratify_by.
-                For the stratification to work, the size of the smallest set (currently {smallest_set}: {smallest_set_size})
-                must be at least as large as the number of strata (currently {n_strata}), i.e. the number of unique row-wise combinations of values in the stratify_by columns (currently {stratify_by}).
-
-                {get_suggestion_for_loosening_stratification("split_into_train_eval")}
-                """
-
-    df_train, df_eval = _split_into_train_eval(df_lazy, eval_rel_size, stratify_by, shuffle, seed)
-
-    if validate:
-        eval_rel_size_actual = get_lazyframe_size(df_eval) / input_size
-
-        logger.debug(f"eval_rel_size: {eval_rel_size}, eval_rel_size_actual: {eval_rel_size_actual}")
-
-        if abs(eval_rel_size_actual - eval_rel_size) > rel_size_deviation_tolerance:
-            raise ValueError(
-                f"""
-                The actual relative size of the eval set ({eval_rel_size_actual}) deviates from the requested relative size ({eval_rel_size}) by more than the specified tolerance ({rel_size_deviation_tolerance}).
-
-                {get_suggestion_for_loosening_stratification("split_into_train_eval")}
-                """
-            )
-
-    return (df_train, df_eval)
-
-
-def _split_into_train_eval(
-    df_lazy: LazyFrame,
-    eval_rel_size: float,
-    stratify_by: List[str] = None,
-    shuffle: bool = True,
-    seed: int = 273,
-) -> Tuple[LazyFrame, LazyFrame]:
-    """Split a dataset into non-overlapping train and eval sets. Allows for stratification by a column or list of columns."""
     idxs = int_range(0, count())
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
 
-    eval_size = (eval_rel_size * count()).floor().clip_min(1).cast(Int64)
+    eval_size = (eval_rel_size * count()).round(0).clip_min(1).cast(Int64)
 
     if stratify_by:
         idxs = idxs.over(stratify_by)
@@ -262,7 +199,5 @@ def k_fold(df: df_pl, k: int, shuffle: bool = True, seed: int = 273):
     return split_into_k_folds(df, k, stratify_by=None, shuffle=shuffle, as_dict=False, as_lazy=False, seed=seed)
 
 
-get_k_folds = split_into_k_folds
 stratified_k_fold = split_into_k_folds
 train_test_split = split_into_train_eval
-train_val_test_split = split_into_train_val_test
