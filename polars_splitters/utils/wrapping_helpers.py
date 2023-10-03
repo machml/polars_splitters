@@ -15,3 +15,16 @@ def get_arg_value(args, kwargs, arg_name, arg_index, default=None, expected_type
     if expected_type:
         arg_value = enforce_type(arg_value, to_type=expected_type, warn=warn_on_recast)
     return arg_value
+
+
+def replace_arg_value(args, kwargs, arg_name, arg_index, new_value):
+    """Replace the value of an argument from either args or kwargs."""
+
+    if arg_name in kwargs:
+        kwargs[arg_name] = new_value
+    else:
+        args = list(args)
+        args[arg_index] = new_value
+        args = tuple(args)
+
+    return args, kwargs

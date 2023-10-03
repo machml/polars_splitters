@@ -3,38 +3,21 @@ from typing import Dict, List, Optional, Tuple, Union
 from loguru import logger
 from polars import DataFrame, Int64, LazyFrame, count, int_range
 
-from polars_splitters.utils.validators import validate_splitting_train_eval
+from polars_splitters.utils.decorators import (
+    type_enforcer_train_eval,
+    validate_splitting_train_eval,
+)
 
 df_pl = DataFrame | LazyFrame
 
 __all__ = [
     "split_into_train_eval",
     "split_into_k_folds",
-    "stratified_k_fold",
-    "train_test_split",
 ]
 
 
-def get_suggestion_for_loosening_stratification(func_name: str) -> str:
-    if func_name == "split_into_train_eval":
-        balance_suggestion = "using an `eval_rel_size` closer to 0.5"
-    elif func_name == "split_into_k_folds":
-        balance_suggestion = "using a smaller `k`"
-
-    return f"""
-            Consider:
-            (a) {balance_suggestion},
-            (b) using fewer columns in `stratify_by` columns,
-            (c) disabling stratification altogether (stratify_by=None) or
-            (d) using a larger input dataset df.
-    """
-
-
-def get_lazyframe_size(df: LazyFrame) -> int:
-    return df.select(count()).collect().item()
-
-
 @logger.catch
+@type_enforcer_train_eval
 @validate_splitting_train_eval
 def split_into_train_eval(
     df_lazy: LazyFrame | DataFrame,
@@ -42,31 +25,36 @@ def split_into_train_eval(
     stratify_by: Optional[str | List[str]] = None,
     shuffle: Optional[bool] = True,
     seed: Optional[int] = 273,
+    as_lazy: Optional[bool] = False,
     validate: Optional[bool] = True,
     rel_size_deviation_tolerance: Optional[float] = 0.1,
-) -> Tuple[LazyFrame, LazyFrame]:
+) -> Tuple[LazyFrame, LazyFrame] | Tuple[DataFrame, DataFrame]:
     r"""
     Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
-    It is a wrapper around _split_into_train_eval including some guardrails: type coercion for the inputs, validation for the inputs and outputs.
+    It is a wrapper around _split_into_train_eval including logging, pre- and post-processing and some guarding rails: type coercion and validation for the inputs and outputs.
+    FIXME: not based on _split_into_train_eval anymore.
 
     Parameters
     ----------
     df_lazy : LazyFrame | DataFrame
-        _description_
+        The polars DataFrame to split.
     eval_rel_size : float
-        _description_
+        The targeted relative size of the eval set. Must be between 0.0 and 1.0.
     stratify_by : str | List[str], optional. Defaults to None.
-        _description_
+        The column names to use for stratification.
+        If None (default), stratification is not performed. Note: Stratification by float columns is not currently supported.
     shuffle : bool, optional. Defaults to True.
-        _description_
+        Whether to shuffle the rows before splitting.
     seed : int, optional. Defaults to 273.
-        _description_
+        The random seed to use in shuffling.
+    as_lazy : bool, optional. Defaults to False.
+        Whether to return the train and eval sets as LazyFrames (True) or DataFrames (False).
     validate : bool, optional. Defaults to True.
-        _description_
+        Whether to validate the inputs and outputs.
     rel_size_deviation_tolerance : float, optional. Defaults to 0.1.
         Sets the maximum allowed abs(eval_rel_size_actual - eval_rel_size).
         When stratifying, the eval_rel_size_actual might deviate from eval_rel_size due to the fact that strata for the given data may not be perfectly divisible at the desired proportion (1-eval_rel_size, eval_rel_size).
-
+        If validate is set to False, this parameter is ignored.
 
     Returns
     -------
@@ -85,15 +73,15 @@ def split_into_train_eval(
     --------
     >>> import polars as pl
     >>> from polars_splitters.core.splitters import split_into_train_eval
-    >>> df = pl.DataFrame(
+    >>> df = DataFrame(
     ...     {
     ...         "feature_1": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
     ...         "treatment": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
     ...         "outcome":   [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
     ...     }
     ... )
-    >>> df_train, df_test = split_into_train_eval(df, eval_rel_size=0.3, stratify_by=["treatment", "outcome"], shuffle=True)
-    >>> print(df_train.collect(), df_test.collect(), sep="\n\n")
+    >>> df_train, df_eval = split_into_train_eval(df, eval_rel_size=0.3, stratify_by=["treatment", "outcome"], shuffle=True, as_lazy=False)
+    >>> print(df_train, df_eval, sep="\n\n")
     shape: (7, 3)
     ┌───────────┬───────────┬─────────┐
     │ feature_1 ┆ treatment ┆ outcome │
@@ -120,8 +108,6 @@ def split_into_train_eval(
     │ 10.0      ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
     """
-    df_lazy = df_lazy.lazy()  # ensure LazyFrame
-
     idxs = int_range(0, count())
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
@@ -137,7 +123,7 @@ def split_into_train_eval(
     df_train = df_lazy.filter(~is_eval)
     df_eval = df_lazy.filter(is_eval)
 
-    return (df_train, df_eval)
+    return df_train, df_eval
 
 
 def split_into_k_folds(
@@ -193,11 +179,3 @@ def split_into_k_folds(
         return folds
     else:
         return [tuple(fold.values()) for fold in folds]
-
-
-def k_fold(df: df_pl, k: int, shuffle: bool = True, seed: int = 273):
-    return split_into_k_folds(df, k, stratify_by=None, shuffle=shuffle, as_dict=False, as_lazy=False, seed=seed)
-
-
-stratified_k_fold = split_into_k_folds
-train_test_split = split_into_train_eval
