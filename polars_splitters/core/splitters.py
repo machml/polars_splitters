@@ -20,7 +20,7 @@ __all__ = [
 @type_enforcer_train_eval
 @validate_splitting_train_eval
 def split_into_train_eval(
-    df_lazy: LazyFrame | DataFrame,
+    df: LazyFrame | DataFrame,
     eval_rel_size: float,
     stratify_by: Optional[str | List[str]] = None,
     shuffle: Optional[bool] = True,
@@ -31,12 +31,11 @@ def split_into_train_eval(
 ) -> Tuple[LazyFrame, LazyFrame] | Tuple[DataFrame, DataFrame]:
     r"""
     Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
-    It is a wrapper around _split_into_train_eval including logging, pre- and post-processing and some guarding rails: type coercion and validation for the inputs and outputs.
-    FIXME: not based on _split_into_train_eval anymore.
+    Thanks to its decorators, it includes  logging and some guardrails: type coercion as well as validation for the inputs and outputs.
 
     Parameters
     ----------
-    df_lazy : LazyFrame | DataFrame
+    df : LazyFrame | DataFrame
         The polars DataFrame to split.
     eval_rel_size : float
         The targeted relative size of the eval set. Must be between 0.0 and 1.0.
@@ -120,62 +119,109 @@ def split_into_train_eval(
 
     is_eval = idxs < eval_size
 
-    df_train = df_lazy.filter(~is_eval)
-    df_eval = df_lazy.filter(is_eval)
+    df_train = df.filter(~is_eval)
+    df_eval = df.filter(is_eval)
 
     return df_train, df_eval
 
 
 def split_into_k_folds(
-    df: Union[DataFrame, LazyFrame],
+    df: LazyFrame | DataFrame,
     k: int,
     stratify_by: Union[str, List[str], Dict[str, float]] = None,
     shuffle: bool = True,
-    as_dict: bool = True,
     as_lazy: bool = False,
+    as_dict: bool = False,
     seed: int = 273,
-) -> Tuple[df_pl, df_pl] | Dict[str, df_pl]:
-    """Split a DataFrame or LazyFrame into k non-overlapping folds.
-    Allows for stratification by a column or list of columns.
-    If a single column is provided, all folds will have the same proportion of that column's values between train and eval sets.
-    If a list of columns is provided, all folds will have the same proportion of combinations of those columns' values between train and eval sets.
+) -> Tuple[df_pl, df_pl]:
+    """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
 
-    Notes:
-    - Stratification by continuously-valued columns (float) is not currently supported.
-    - All k folds have the same sizes for the train and eval sets. However, len(df) % k rows will never appear in the eval sets. This is usually negligible for most use cases, since typically (len(df) % k) / len(df) << 1.0.
-
-
-    Args:
-        df (polars.DataFrame or polars.LazyFrame): The DataFrame to split.
-        k (int): The number of folds to create.
-        stratify_by (str or list of str, optional): A column or list of columns to stratify the folds by.
-        shuffle (bool, optional): Whether to shuffle the data before (stratifying and) splitting. Defaults to True.
-        as_dict (bool, optional): Whether to return the folds as a list of dictionaries of the form
-            {"train": ..., "eval": ...} (as_dict=True) or as a list of tuples (df_train, df_eval). Defaults to False.
-        as_lazy (bool, optional): Whether to return the folds as LazyFrames or DataFrames. Defaults to False.
-        seed (int, optional): The random seed to use for shuffling. Defaults to None.
-
-    Returns:
-        A dictionary of folds, where the keys are the names of the evaluation sets
-        (e.g. "train", "valid", "test") and the values are the corresponding
-        DataFrames or LazyFrames.
-
-    Raises:
-        ValueError: If k is less than 2.
-        NotImplementedError: If any column in stratify_by is of type float.
-    """
     if k < 2:
         raise ValueError("k must be greater than 1")
 
-    df_lazy = df.lazy()
+    df = df.lazy()
+
+    idxs = int_range(0, count())
+    if shuffle:
+        idxs = idxs.shuffle(seed=seed)
+
+    eval_size = (count() / k).round(0).clip_min(1).cast(Int64)
+
+    if stratify_by:
+        idxs = idxs.over(stratify_by)
+        eval_size = eval_size.over(stratify_by)
 
     folds = [{"train": None, "eval": None} for i in range(k)]
     for i in range(k):
-        folds[i] = split_into_train_eval(
-            df_lazy, 1 / k, stratify_by=stratify_by, shuffle=shuffle, as_dict=True, as_lazy=as_lazy, seed=seed
-        )
+        is_eval = (i * eval_size <= idxs) & (idxs < (i + 1) * eval_size)
+
+        df_train = df.filter(~is_eval)
+        df_eval = df.filter(is_eval)
+
+        if as_lazy:
+            folds[i] = {"train": df_train, "eval": df_eval}
+        else:
+            folds[i] = {"train": df_train.collect(), "eval": df_eval.collect()}
 
     if as_dict:
         return folds
     else:
         return [tuple(fold.values()) for fold in folds]
+
+
+def _split_into_train_eval_k_folded(
+    df: LazyFrame | DataFrame,
+    eval_rel_size: float,
+    k: int,
+    stratify_by: Optional[str | List[str]] = None,
+    shuffle: Optional[bool] = True,
+    seed: Optional[int] = 273,
+    as_lazy: Optional[bool] = False,
+    validate: Optional[bool] = True,
+    rel_size_deviation_tolerance: Optional[float] = 0.1,
+    # df: LazyFrame | DataFrame,
+    # k: int,
+    # stratify_by: Union[str, List[str], Dict[str, float]] = None,
+    # shuffle: bool = True,
+    # as_lazy: bool = False,
+    # as_dict: bool = False,
+    # seed: int = 273,
+) -> Tuple[df_pl, df_pl]:
+    """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
+
+    idxs = int_range(0, count())
+    if shuffle:
+        idxs = idxs.shuffle(seed=seed)
+
+    if k > 1:
+        eval_rel_size = 1 / k
+
+    eval_size = (eval_rel_size * count()).round(0).clip_min(1).cast(Int64)
+
+    if stratify_by:
+        idxs = idxs.over(stratify_by)
+        eval_size = eval_size.over(stratify_by)
+
+    folds = [{"train": None, "eval": None} for i in range(k)]
+    for i in range(k):
+        is_eval = i * eval_size <= idxs
+        is_eval = is_eval & (idxs < (i + 1) * eval_size)
+
+        df_train = df.filter(~is_eval)
+        df_eval = df.filter(is_eval)
+
+        if as_lazy:
+            folds[i] = {"train": df_train, "eval": df_eval}
+        else:
+            folds[i] = {"train": df_train.collect(), "eval": df_eval.collect()}
+
+    if k > 1:
+        if as_dict:
+            return folds
+        else:
+            return [tuple(fold.values()) for fold in folds]
+    else:
+        if as_dict:
+            return folds[0]
+        else:
+            return tuple(folds[0].values())
