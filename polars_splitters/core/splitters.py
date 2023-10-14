@@ -179,21 +179,35 @@ def _split_into_train_eval_k_folded(
     as_lazy: Optional[bool] = False,
     validate: Optional[bool] = True,
     rel_size_deviation_tolerance: Optional[float] = 0.1,
-    # df: LazyFrame | DataFrame,
-    # k: int,
-    # stratify_by: Union[str, List[str], Dict[str, float]] = None,
-    # shuffle: bool = True,
-    # as_lazy: bool = False,
-    # as_dict: bool = False,
-    # seed: int = 273,
-) -> Tuple[df_pl, df_pl]:
+@logger.catch
+@enforce_input_outputs_expected_types
+@validate_splitting
+def _split_into_k_train_eval_folds(
+    df: LazyFrame | DataFrame,
+    eval_rel_size: float | None = None,
+    k: int | None = 1,
+    stratify_by: Optional[str | List[str]] = None,
+    shuffle: Optional[bool] = True,
+    seed: Optional[int] = 273,
+    as_lazy: Optional[bool] = False,
+    as_dict: Optional[bool] = False,
+    validate: Optional[bool] = True,
+    rel_size_deviation_tolerance: Optional[float] = 0.1,
+) -> (
+    Tuple[LazyFrame, LazyFrame]
+    | Tuple[DataFrame, DataFrame]
+    | List[Tuple[LazyFrame, LazyFrame]]
+    | List[Tuple[DataFrame, DataFrame]]
+    | List[Dict[str, LazyFrame]]
+    | List[Dict[str, DataFrame]]
+):
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
 
     idxs = int_range(0, count())
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
 
-    if k > 1:
+    if k > 1:  # k-fold
         eval_rel_size = 1 / k
 
     eval_size = (eval_rel_size * count()).round(0).clip_min(1).cast(Int64)
@@ -207,21 +221,6 @@ def _split_into_train_eval_k_folded(
         is_eval = i * eval_size <= idxs
         is_eval = is_eval & (idxs < (i + 1) * eval_size)
 
-        df_train = df.filter(~is_eval)
-        df_eval = df.filter(is_eval)
+        folds[i] = {"train": df.filter(~is_eval), "eval": df.filter(is_eval)}
 
-        if as_lazy:
-            folds[i] = {"train": df_train, "eval": df_eval}
-        else:
-            folds[i] = {"train": df_train.collect(), "eval": df_eval.collect()}
-
-    if k > 1:
-        if as_dict:
-            return folds
-        else:
-            return [tuple(fold.values()) for fold in folds]
-    else:
-        if as_dict:
-            return folds[0]
-        else:
-            return tuple(folds[0].values())
+    return folds
