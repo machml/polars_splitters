@@ -136,56 +136,106 @@ def split_into_k_folds(
 ) -> Tuple[df_pl, df_pl]:
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
 
-    if k < 2:
-        raise ValueError("k must be greater than 1")
 
-    df = df.lazy()
-
-    idxs = int_range(0, count())
-    if shuffle:
-        idxs = idxs.shuffle(seed=seed)
-
-    eval_size = (count() / k).round(0).clip_min(1).cast(Int64)
-
-    if stratify_by:
-        idxs = idxs.over(stratify_by)
-        eval_size = eval_size.over(stratify_by)
-
-    folds = [{"train": None, "eval": None} for i in range(k)]
-    for i in range(k):
-        is_eval = (i * eval_size <= idxs) & (idxs < (i + 1) * eval_size)
-
-        df_train = df.filter(~is_eval)
-        df_eval = df.filter(is_eval)
-
-        if as_lazy:
-            folds[i] = {"train": df_train, "eval": df_eval}
-        else:
-            folds[i] = {"train": df_train.collect(), "eval": df_eval.collect()}
-
-    if as_dict:
-        return folds
-    else:
-        return [tuple(fold.values()) for fold in folds]
-
-
-def _split_into_train_eval_k_folded(
+@overload
+def _split_into_k_train_eval_folds(
     df: LazyFrame | DataFrame,
-    eval_rel_size: float,
-    k: int,
+    eval_rel_size: Literal[None] = ...,
+    k: Optional[int] = 1,
     stratify_by: Optional[str | List[str]] = None,
     shuffle: Optional[bool] = True,
     seed: Optional[int] = 273,
     as_lazy: Optional[bool] = False,
+    as_dict: Optional[bool] = False,
     validate: Optional[bool] = True,
     rel_size_deviation_tolerance: Optional[float] = 0.1,
+) -> (
+    Tuple[LazyFrame, LazyFrame]
+    | Tuple[DataFrame, DataFrame]
+    | List[Tuple[LazyFrame, LazyFrame]]
+    | List[Tuple[DataFrame, DataFrame]]
+    | List[Dict[str, LazyFrame]]
+    | List[Dict[str, DataFrame]]
+):
+    ...
+
+
+@overload
+def _split_into_k_train_eval_folds(
+    df: LazyFrame | DataFrame,
+    eval_rel_size: float | None = None,
+    k: Optional[int] = 1,
+    stratify_by: Optional[str | List[str]] = None,
+    shuffle: Optional[bool] = True,
+    seed: Optional[int] = 273,
+    as_lazy: Optional[bool] = False,
+    as_dict: Optional[bool] = False,
+    validate: Optional[bool] = True,
+    rel_size_deviation_tolerance: Optional[float] = 0.1,
+) -> (
+    Tuple[LazyFrame, LazyFrame]
+    | Tuple[DataFrame, DataFrame]
+    | List[Tuple[LazyFrame, LazyFrame]]
+    | List[Tuple[DataFrame, DataFrame]]
+    | List[Dict[str, LazyFrame]]
+    | List[Dict[str, DataFrame]]
+):
+    ...
+
+
+@overload
+def _split_into_k_train_eval_folds(
+    df: LazyFrame | DataFrame,
+    eval_rel_size: float | None = None,
+    k: Optional[int] = 1,
+    stratify_by: Optional[str | List[str]] = None,
+    shuffle: Optional[bool] = True,
+    seed: Optional[int] = 273,
+    as_lazy: Optional[bool] = False,
+    as_dict: Optional[bool] = False,
+    validate: Optional[bool] = True,
+    rel_size_deviation_tolerance: Optional[float] = 0.1,
+) -> (
+    Tuple[LazyFrame, LazyFrame]
+    | Tuple[DataFrame, DataFrame]
+    | List[Tuple[LazyFrame, LazyFrame]]
+    | List[Tuple[DataFrame, DataFrame]]
+    | List[Dict[str, LazyFrame]]
+    | List[Dict[str, DataFrame]]
+):
+    ...
+
+
+@overload
+def _split_into_k_train_eval_folds(
+    df: LazyFrame | DataFrame,
+    eval_rel_size: float | None = None,
+    k: Optional[int] = 1,
+    stratify_by: Optional[str | List[str]] = None,
+    shuffle: Optional[bool] = True,
+    seed: Optional[int] = 273,
+    as_lazy: Optional[bool] = False,
+    as_dict: Optional[bool] = False,
+    validate: Optional[bool] = True,
+    rel_size_deviation_tolerance: Optional[float] = 0.1,
+) -> (
+    Tuple[LazyFrame, LazyFrame]
+    | Tuple[DataFrame, DataFrame]
+    | List[Tuple[LazyFrame, LazyFrame]]
+    | List[Tuple[DataFrame, DataFrame]]
+    | List[Dict[str, LazyFrame]]
+    | List[Dict[str, DataFrame]]
+):
+    ...
+
+
 @logger.catch
 @enforce_input_outputs_expected_types
 @validate_splitting
 def _split_into_k_train_eval_folds(
     df: LazyFrame | DataFrame,
     eval_rel_size: float | None = None,
-    k: int | None = 1,
+    k: Optional[int] = 1,
     stratify_by: Optional[str | List[str]] = None,
     shuffle: Optional[bool] = True,
     seed: Optional[int] = 273,
