@@ -1,300 +1,193 @@
 from collections import Counter
 
-import polars as pl
 import pytest
+from polars import DataFrame, LazyFrame, concat
 from pytest_check import check
 
-from polars_splitters.splitters import (
-    _split_into_subsets,
-    split_into_k_folds,
-    split_into_train_eval,
-    split_into_train_val_test,
-    validate_rel_sizes,
-)
+from polars_splitters.core.splitters import split_into_k_folds, split_into_train_eval
 
 SEED = 273
-df_pl = pl.DataFrame | pl.LazyFrame
-
-
-def test_validate_rel_sizes():
-    def mock_splitter(x, rel_sizes):
-        return None
-
-    # Test valid input
-    rel_sizes = (0.7, 0.2, 0.1)
-    check.is_none(validate_rel_sizes(mock_splitter)(None, rel_sizes=rel_sizes))
-
-    # Test valid input
-    rel_sizes = {"train": 0.7, "val": 0.2, "test": 0.1}
-    check.is_none(validate_rel_sizes(mock_splitter)(None, rel_sizes=rel_sizes))
-
-    # Test invalid input: not summing to one
-    rel_sizes = (0.7, 0.2)
-    with check.raises(ValueError):
-        validate_rel_sizes(mock_splitter)(None, rel_sizes=rel_sizes)
-
-    # Test invalid input: fraction larger than 1
-    rel_sizes = (0.7, 0.2, 0.8)
-    with check.raises(ValueError):
-        validate_rel_sizes(mock_splitter)(None, rel_sizes=rel_sizes)
-
-    # Test invalid input: tuple with negative value
-    rel_sizes = (0.7, 0.8, -0.5)
-    with check.raises(ValueError):
-        validate_rel_sizes(mock_splitter)(None, rel_sizes=rel_sizes)
-
-    # Test invalid input: tuple with non-float
-    rel_sizes = (0.2, 0.3, "0.5")
-    with check.raises(TypeError):
-        validate_rel_sizes(mock_splitter)(None, rel_sizes=rel_sizes)
-
-
-class TestSplitIntoSubsets:
-    @pytest.mark.parametrize("from_lazy", [False, True])
-    @pytest.mark.parametrize("rel_sizes", [(0.5, 0.1, 0.1), {"train": 0.5, "val": 0.1, "test": 0.1}])
-    def test_handling_rel_sizes_not_summing_to_one(self, df_basic, from_lazy, rel_sizes):
-        with check.raises(ValueError):
-            _split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes)
-
-    @pytest.mark.parametrize("from_lazy", [False, True])
-    @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
-    def test_as_tuples(self, df_basic, from_lazy, rel_sizes):
-        subsets = _split_into_subsets(df_basic(from_lazy), rel_sizes=rel_sizes)
-        check.equal(len(subsets), 3)
-        check.equal(len(subsets[0]), 7)
-        check.equal(len(subsets[1]), 2)
-        check.equal(len(subsets[2]), 1)
-
-    @pytest.mark.parametrize("from_lazy", [False, True])
-    @pytest.mark.parametrize("shuffle", [False, True])
-    @pytest.mark.parametrize("as_dict", [False, True])
-    @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
-    def test_to_df(self, df_basic, from_lazy, rel_sizes, shuffle, as_dict):
-        subsets = _split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle, as_dict=as_dict)
-
-        if isinstance(rel_sizes, dict) and as_dict:
-            check.equal(len(subsets), 3)
-            check.equal(len(subsets["train"]), 7)
-            check.equal(len(subsets["val"]), 2)
-            check.equal(len(subsets["test"]), 1)
-        else:
-            check.equal(len(subsets[0]), 7)
-            check.equal(len(subsets[1]), 2)
-            check.equal(len(subsets[2]), 1)
-
-    @pytest.mark.parametrize("from_lazy", [False, True])
-    @pytest.mark.parametrize("shuffle", [False, True])
-    @pytest.mark.parametrize("as_dict", [False, True])
-    @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
-    def test_to_lazy_df(self, df_basic, from_lazy, rel_sizes, shuffle, as_dict):
-        subsets = _split_into_subsets(
-            df=df_basic(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle, as_dict=as_dict, as_lazy=True
-        )
-
-        if isinstance(rel_sizes, dict) and as_dict:
-            for subset in subsets.values():
-                check.is_instance(subset, pl.LazyFrame)
-            check.equal(len(subsets), 3)
-            check.equal(len(subsets["train"].collect()), 7)
-            check.equal(len(subsets["val"].collect()), 2)
-            check.equal(len(subsets["test"].collect()), 1)
-        else:
-            for subset in subsets:
-                check.is_instance(subset, pl.LazyFrame)
-            check.equal(len(subsets[0].collect()), 7)
-            check.equal(len(subsets[1].collect()), 2)
-            check.equal(len(subsets[2].collect()), 1)
-
-    @pytest.mark.parametrize("from_lazy", [False, True])
-    @pytest.mark.parametrize("shuffle", [False, True])
-    @pytest.mark.parametrize("rel_sizes", [(0.7, 0.2, 0.1), {"train": 0.7, "val": 0.2, "test": 0.1}])
-    def test_shuffle(self, df_basic, from_lazy, rel_sizes, shuffle):
-        subsets = _split_into_subsets(df=df_basic(from_lazy), rel_sizes=rel_sizes, shuffle=shuffle)
-
-        df_ = df_basic(from_lazy)
-        if from_lazy:
-            df_ = df_.collect()
-
-        if shuffle:
-            check.is_true(~subsets[0].frame_equal(df_[0:7]))
-            check.is_true(~subsets[1].frame_equal(df_[7:9]))
-            check.is_true(~subsets[2].frame_equal(df_[9]))
-        else:
-            check.is_true(subsets[0].frame_equal(df_[0:7]))
-            check.is_true(subsets[1].frame_equal(df_[7:9]))
-            check.is_true(subsets[2].frame_equal(df_[9]))
-
-    @pytest.mark.parametrize("from_lazy", [False, True])
-    @pytest.mark.parametrize(
-        "stratify_by, strata_counts_train, strata_counts_val, strata_counts_test",
-        [
-            (
-                "treatment",
-                {0: 140, 1: 140},
-                {0: 40, 1: 40},
-                {0: 20, 1: 20},
-            ),
-            (
-                ["treatment", "outcome"],
-                {(0, 1): 70, (1, 0): 70, (1, 1): 70, (0, 0): 70},
-                {(0, 1): 20, (1, 0): 20, (1, 1): 20, (0, 0): 20},
-                {(0, 1): 10, (1, 0): 10, (1, 1): 10, (0, 0): 10},
-            ),
-        ],
-    )
-    def test_stratification(
-        self, df_ubools, from_lazy, stratify_by, strata_counts_train, strata_counts_val, strata_counts_test
-    ):
-        subsets = _split_into_subsets(
-            df=df_ubools(from_lazy=from_lazy, n=400),
-            rel_sizes={"train": 0.7, "val": 0.2, "test": 0.1},
-            stratify_by=stratify_by,
-            as_dict=True,
-            shuffle=False,
-        )
-
-        df_train = subsets["train"]
-        df_val = subsets["val"]
-        df_test = subsets["test"]
-
-        if stratify_by == "treatment":
-            unique_combinations_count_train = Counter(df_train["treatment"])
-            unique_combinations_count_val = Counter(df_val["treatment"])
-            unique_combinations_count_test = Counter(df_test["treatment"])
-        elif stratify_by == ["treatment", "outcome"]:
-            unique_combinations_count_train = Counter(zip(df_train["treatment"], df_train["outcome"]))
-            unique_combinations_count_val = Counter(zip(df_val["treatment"], df_val["outcome"]))
-            unique_combinations_count_test = Counter(zip(df_test["treatment"], df_test["outcome"]))
-        else:
-            pass
-
-        if stratify_by is not None:
-            check.equal(unique_combinations_count_train, Counter(strata_counts_train))
-            check.equal(unique_combinations_count_val, Counter(strata_counts_val))
-            check.equal(unique_combinations_count_test, Counter(strata_counts_test))
-        else:
-            pass
-
-    def test_stratification_on_non_discrete_vars(self, df_ubools):
-        with check.raises(NotImplementedError):
-            _split_into_subsets(
-                df=df_ubools(n=16),
-                rel_sizes={"train": 0.7, "val": 0.2, "test": 0.1},
-                stratify_by=["treatment", "feature_2"],
-                as_dict=True,
-                shuffle=False,
-            )
 
 
 class TestSplitIntoTrainEval:
-    def test_basic(self, df_basic):
-        eval_fraction = 0.2
-        df_train, df_eval = split_into_train_eval(df=df_basic(from_lazy=False, n_cols=1), eval_fraction=eval_fraction)
-        check.equal(len(df_train), 8)
-        check.equal(len(df_eval), 2)
-
-    def test_stratification_on_single_var(self, df_ubools):
-        df_train, df_eval = split_into_train_eval(df=df_ubools(n=400), eval_fraction=0.2, stratify_by="treatment")
-        check.equal(len(df_train), 320)
-        check.equal(len(df_eval), 80)
-
-        check.equal(
-            Counter(df_train["treatment"]),
-            Counter({0: 160, 1: 160}),
+    @pytest.mark.parametrize("from_lazy", [False, True])
+    @pytest.mark.parametrize("eval_rel_size, expected_eval_size", [(0.3, 3), (0.4, 4)])
+    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize("shuffle", [False, True])
+    @pytest.mark.parametrize("as_lazy", [False, True])
+    @pytest.mark.parametrize("as_dict", [False, True])
+    @pytest.mark.parametrize("validate", [False, True])
+    def test_output_types_e_sizes_inputting_basic_df(
+        self,
+        df_basic,
+        from_lazy,
+        eval_rel_size,
+        expected_eval_size,
+        stratify_by,
+        shuffle,
+        as_lazy,
+        as_dict,
+        validate,
+    ):
+        result = split_into_train_eval(
+            df=df_basic(from_lazy),
+            eval_rel_size=eval_rel_size,
+            stratify_by=stratify_by,
+            shuffle=shuffle,
+            seed=SEED,
+            as_lazy=as_lazy,
+            as_dict=as_dict,
+            validate=validate,
+            rel_size_deviation_tolerance=0.1,
         )
-        check.equal(
-            Counter(df_eval["treatment"]),
-            Counter({0: 40, 1: 40}),
+        if as_dict:
+            check.is_instance(result, dict)
+            if as_lazy:
+                check.is_instance(result["train"], LazyFrame)
+                check.is_instance(result["eval"], LazyFrame)
+
+                df_train, df_eval = result["train"].collect(), result["eval"].collect()
+
+            elif not as_lazy:
+                check.is_instance(result["train"], DataFrame)
+                check.is_instance(result["eval"], DataFrame)
+
+                df_train, df_eval = result["train"], result["eval"]
+
+        elif not as_dict:
+            check.is_instance(result, tuple)
+            if as_lazy:
+                check.is_instance(result[0], LazyFrame)
+                check.is_instance(result[1], LazyFrame)
+
+                df_train, df_eval = result[0].collect(), result[1].collect()
+
+            elif not as_lazy:
+                check.is_instance(result[0], DataFrame)
+                check.is_instance(result[1], DataFrame)
+
+                df_train, df_eval = result[0], result[1]
+
+        check.is_true(df_train.shape == (10 - expected_eval_size, 3))
+        check.is_true(df_eval.shape == (expected_eval_size, 3))
+
+        # non-overlappingness of df_train, df_eval
+        if not from_lazy and as_dict and not as_lazy and not shuffle:
+            check.is_true(result["train"].shape[0] + result["eval"].shape[0] == df_basic(from_lazy).shape[0])
+
+            df_concat = concat([result["train"], result["eval"]])
+            n_duplicates = df_concat.is_duplicated().sum()
+            check.is_true(n_duplicates == 0)
+
+    @pytest.mark.parametrize("from_lazy", [False, True])
+    @pytest.mark.parametrize("n_input", [400])
+    @pytest.mark.parametrize("eval_rel_size", [0.3, 0.4])
+    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize("shuffle", [False, True])
+    def test_output_sizes_inputting_df_ubools(
+        self,
+        df_ubools,
+        from_lazy,
+        n_input,
+        eval_rel_size,
+        stratify_by,
+        shuffle,
+    ):
+        result = split_into_train_eval(
+            df=df_ubools(from_lazy, n=n_input),
+            eval_rel_size=eval_rel_size,
+            stratify_by=stratify_by,
+            shuffle=shuffle,
+            seed=SEED,
+            as_lazy=False,
+            as_dict=True,
+            validate=True,
+            rel_size_deviation_tolerance=0.1,
         )
 
-    def test_stratification_on_multiple_vars(self, df_ubools):
-        df_train, df_eval = split_into_train_eval(
-            df=df_ubools(n=400), eval_fraction=0.2, stratify_by=["treatment", "outcome"]
-        )
-        check.equal(len(df_train), 320)
-        check.equal(len(df_eval), 80)
+        expected_eval_size = int(n_input * eval_rel_size)
+        df_train, df_eval = result["train"], result["eval"]
+        check.is_true(df_train.shape == (n_input - expected_eval_size, 5))
+        check.is_true(df_eval.shape == (expected_eval_size, 5))
 
-        check.equal(
-            Counter(zip(df_train["treatment"], df_train["outcome"])),
-            Counter({(0, 1): 80, (1, 0): 80, (1, 1): 80, (0, 0): 80}),
-        )
-        check.equal(
-            Counter(zip(df_eval["treatment"], df_eval["outcome"])),
-            Counter({(0, 1): 20, (1, 0): 20, (1, 1): 20, (0, 0): 20}),
+    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    def test_stratification_inputting_basic_df(self, df_basic, stratify_by):
+        result = split_into_train_eval(
+            df=df_basic(from_lazy=False),
+            eval_rel_size=0.3,
+            stratify_by=stratify_by,
+            shuffle=False,
+            seed=SEED,
+            as_lazy=False,
+            as_dict=True,
+            validate=True,
+            rel_size_deviation_tolerance=0.1,
         )
 
+        if stratify_by is None:
+            check.equal(Counter(result["train"]["treatment"]), Counter({1: 6, 0: 1}))
+            check.equal(Counter(result["eval"]["treatment"]), Counter({0: 3}))
+        elif stratify_by == "treatment":
+            check.equal(Counter(result["train"]["treatment"]), Counter({1: 4, 0: 3}))
+            check.equal(Counter(result["eval"]["treatment"]), Counter({1: 2, 0: 1}))
+        elif stratify_by == ["treatment", "outcome"]:
+            check.equal(
+                Counter(zip(result["train"]["treatment"], result["train"]["outcome"])),
+                Counter({(0, 0): 3, (1, 0): 2, (1, 1): 2}),
+            )
+            check.equal(
+                Counter(zip(result["eval"]["treatment"], result["eval"]["outcome"])),
+                Counter({(0, 0): 1, (1, 0): 1, (1, 1): 1}),
+            )
 
-def test_split_into_train_val_test(df_basic):
-    df_train, df_val, df_test = split_into_train_val_test(df=df_basic(), rel_sizes=(0.7, 0.2, 0.1))
-    check.equal(len(df_train), 7)
-    check.equal(len(df_val), 2)
-    check.equal(len(df_test), 1)
+    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    def test_stratification_inputting_df_ubools(self, df_ubools, stratify_by):
+        n_input = 400
+        eval_rel_size = 0.3
+        result = split_into_train_eval(
+            df=df_ubools(from_lazy=False, n=n_input),
+            eval_rel_size=eval_rel_size,
+            stratify_by=stratify_by,
+            shuffle=False,
+            seed=SEED,
+            as_lazy=False,
+            as_dict=True,
+            validate=True,
+            rel_size_deviation_tolerance=0.1,
+        )
+
+        if stratify_by is None:
+            check.equal(Counter(result["train"]["treatment"]), Counter({0: 141, 1: 139}))
+            check.equal(Counter(result["eval"]["treatment"]), Counter({1: 61, 0: 59}))
+        elif stratify_by == "treatment":
+            check.equal(Counter(result["train"]["treatment"]), Counter({1: 140, 0: 140}))
+            check.equal(Counter(result["eval"]["treatment"]), Counter({0: 60, 1: 60}))
+
+            check.equal(
+                Counter(zip(result["train"]["treatment"], result["train"]["outcome"])),
+                Counter({(1, 0): 67, (0, 1): 68, (0, 0): 72, (1, 1): 73}),
+            )
+            check.equal(
+                Counter(zip(result["eval"]["treatment"], result["eval"]["outcome"])),
+                Counter({(1, 0): 33, (0, 1): 32, (0, 0): 28, (1, 1): 27}),
+            )
+            check.equal(Counter(result["eval"]["treatment"]), Counter({0: 60, 1: 60}))
+        elif stratify_by == ["treatment", "outcome"]:
+            check.equal(
+                Counter(zip(result["train"]["treatment"], result["train"]["outcome"])),
+                Counter({(0, 1): 70, (1, 0): 70, (0, 0): 70, (1, 1): 70}),
+            )
+            check.equal(
+                Counter(zip(result["eval"]["treatment"], result["eval"]["outcome"])),
+                Counter({(1, 0): 30, (0, 0): 30, (1, 1): 30, (0, 1): 30}),
+            )
 
 
 class TestSplitIntoKFolds:
-    def test_basic_as_dict(self, df_basic):
-        k = 5
-        folds = split_into_k_folds(df=df_basic(), k=k)
-        check.equal(len(folds), k)
-
-        for i in range(k):
-            check.equal(len(folds[i]["train"]), 8)
-            check.equal(len(folds[i]["eval"]), 2)
-
-    def test_basic_as_tuple(self, df_basic):
-        k = 5
-        folds = split_into_k_folds(df=df_basic(), k=k, as_dict=False)
-        check.equal(len(folds), k)
-
-        for i in range(k):
-            df_train, df_eval = folds[i]
-            check.equal(len(df_train), 8)
-            check.equal(len(df_eval), 2)
-
-    def test_stratification_on_single_var(self, df_ubools):
-        k = 5
-        folds = split_into_k_folds(df=df_ubools(n=400), k=k, stratify_by="treatment")
-        check.equal(len(folds), k)
-
-        for i in range(k):
-            check.equal(len(folds[i]["train"]), 320)
-            check.equal(len(folds[i]["eval"]), 80)
-
-            check.equal(
-                Counter(folds[i]["train"]["treatment"]),
-                Counter({0: 160, 1: 160}),
-            )
-
-            check.equal(
-                Counter(folds[i]["eval"]["treatment"]),
-                Counter({0: 40, 1: 40}),
-            )
-
-    def test_stratification_on_multiple_vars(self, df_ubools):
-        k = 5
-        folds = split_into_k_folds(df=df_ubools(n=400), k=k, stratify_by=["treatment", "outcome"])
-        check.equal(len(folds), k)
-
-        for i in range(k):
-            check.equal(len(folds[i]["train"]), 320)
-            check.equal(len(folds[i]["eval"]), 80)
-
-            check.equal(
-                Counter(zip(folds[i]["train"]["treatment"], folds[i]["train"]["outcome"])),
-                Counter({(0, 1): 80, (1, 0): 80, (1, 1): 80, (0, 0): 80}),
-            )
-
-            check.equal(
-                Counter(zip(folds[i]["eval"]["treatment"], folds[i]["eval"]["outcome"])),
-                Counter({(0, 1): 20, (1, 0): 20, (1, 1): 20, (0, 0): 20}),
-            )
-
-    def test_stratification_on_non_discrete_vars(self, df_ubools):
-        with check.raises(NotImplementedError):
-            split_into_k_folds(
-                df=df_ubools(n=16),
-                k=3,
-                stratify_by=["treatment", "feature_2"],
-                as_dict=True,
-                shuffle=False,
-            )
+    pass
+    # TODO: test folds & contents types
+    # TODO: test folds sizes
+    # TODO: test non-overlappingness of df_train, df_eval in each fold
+    # TODO: test non-overlappingness of df_evals for different folds
+    # TODO: test validation: stratification by float column
+    # TODO: test validation: stratification, rel_size_deviation_tolerance
