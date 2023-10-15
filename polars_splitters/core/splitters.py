@@ -1,11 +1,11 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Literal, Optional, Tuple, overload
 
 from loguru import logger
 from polars import DataFrame, Int64, LazyFrame, count, int_range
 
-from polars_splitters.utils.decorators import (
-    type_enforcer_train_eval,
-    validate_splitting_train_eval,
+from polars_splitters.utils.guardrails import (
+    enforce_input_outputs_expected_types,
+    validate_splitting,
 )
 
 df_pl = DataFrame | LazyFrame
@@ -16,9 +16,6 @@ __all__ = [
 ]
 
 
-@logger.catch
-@type_enforcer_train_eval
-@validate_splitting_train_eval
 def split_into_train_eval(
     df: LazyFrame | DataFrame,
     eval_rel_size: float,
@@ -26,12 +23,13 @@ def split_into_train_eval(
     shuffle: Optional[bool] = True,
     seed: Optional[int] = 273,
     as_lazy: Optional[bool] = False,
+    as_dict: Optional[bool] = False,
     validate: Optional[bool] = True,
     rel_size_deviation_tolerance: Optional[float] = 0.1,
-) -> Tuple[LazyFrame, LazyFrame] | Tuple[DataFrame, DataFrame]:
+) -> Tuple[LazyFrame, LazyFrame] | Tuple[DataFrame, DataFrame] | Dict[str, LazyFrame] | Dict[str, DataFrame]:
     r"""
     Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
-    Thanks to its decorators, it includes  logging and some guardrails: type coercion as well as validation for the inputs and outputs.
+    It includes logging and some guardrails: type coercion as well as validation for the inputs and outputs.
 
     Parameters
     ----------
@@ -48,6 +46,8 @@ def split_into_train_eval(
         The random seed to use in shuffling.
     as_lazy : bool, optional. Defaults to False.
         Whether to return the train and eval sets as LazyFrames (True) or DataFrames (False).
+    as_dict : bool, optional. Defaults to False.
+        Whether to return the train and eval sets as a tuple (False) or as a dictionary (True).
     validate : bool, optional. Defaults to True.
         Whether to validate the inputs and outputs.
     rel_size_deviation_tolerance : float, optional. Defaults to 0.1.
@@ -57,8 +57,8 @@ def split_into_train_eval(
 
     Returns
     -------
-    Tuple[LazyFrame, LazyFrame]
-        _description_
+    Tuple[LazyFrame, LazyFrame] | Tuple[DataFrame, DataFrame] | Dict[str, LazyFrame] | Dict[str, DataFrame]
+        df_train and df_eval, either as a tuple or as a dictionary, and either as LazyFrames or DataFrames, depending on the values of as_dict and as_lazy.
 
     Raises
     ------
@@ -107,34 +107,45 @@ def split_into_train_eval(
     │ 10.0      ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
     """
-    idxs = int_range(0, count())
-    if shuffle:
-        idxs = idxs.shuffle(seed=seed)
-
-    eval_size = (eval_rel_size * count()).round(0).clip_min(1).cast(Int64)
-
-    if stratify_by:
-        idxs = idxs.over(stratify_by)
-        eval_size = eval_size.over(stratify_by)
-
-    is_eval = idxs < eval_size
-
-    df_train = df.filter(~is_eval)
-    df_eval = df.filter(is_eval)
-
-    return df_train, df_eval
+    return _split_into_k_train_eval_folds(
+        df=df,
+        eval_rel_size=eval_rel_size,
+        k=1,
+        stratify_by=stratify_by,
+        shuffle=shuffle,
+        seed=seed,
+        as_lazy=as_lazy,
+        as_dict=as_dict,
+        validate=validate,
+        rel_size_deviation_tolerance=rel_size_deviation_tolerance,
+    )
 
 
 def split_into_k_folds(
     df: LazyFrame | DataFrame,
-    k: int,
-    stratify_by: Union[str, List[str], Dict[str, float]] = None,
-    shuffle: bool = True,
-    as_lazy: bool = False,
-    as_dict: bool = False,
-    seed: int = 273,
+    k: Optional[int] = 1,
+    stratify_by: Optional[str | List[str]] = None,
+    shuffle: Optional[bool] = True,
+    seed: Optional[int] = 273,
+    as_lazy: Optional[bool] = False,
+    as_dict: Optional[bool] = False,
+    validate: Optional[bool] = True,
+    rel_size_deviation_tolerance: Optional[float] = 0.1,
 ) -> Tuple[df_pl, df_pl]:
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
+
+    return _split_into_k_train_eval_folds(
+        df=df,
+        eval_rel_size=None,
+        k=k,
+        stratify_by=stratify_by,
+        shuffle=shuffle,
+        seed=seed,
+        as_lazy=as_lazy,
+        as_dict=as_dict,
+        validate=validate,
+        rel_size_deviation_tolerance=rel_size_deviation_tolerance,
+    )
 
 
 @overload
