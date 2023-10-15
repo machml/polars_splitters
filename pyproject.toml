@@ -10,7 +10,12 @@ packages = [{ include = "polars_splitters" }]
 python = ">3.9, <4.0"
 polars = "^0.19.3"
 loguru = "^0.7.2"
+pytest = "^7.4.2"
+pytest-check = "^2.2.2"
 
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.25.2"
 
 [build-system]
 requires = ["poetry-core"]

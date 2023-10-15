@@ -75,7 +75,7 @@ def validate_splitting(func: Callable) -> Callable:
                 )
             else:
                 if k > 1:
-                    validate_var_within_bounds(k, (2, None))
+                    validate_var_within_bounds(k, (1, None))
                     eval_rel_size_ = 1 / k
                     if not isinstance(k, int):
                         raise TypeError(f"k must be of type int, got {type(k)}")

@@ -1,6 +1,7 @@
 from collections import Counter
 
 import pytest
+from loguru import logger
 from polars import DataFrame, LazyFrame, concat
 from pytest_check import check
 
@@ -192,10 +193,125 @@ class TestSplitIntoTrainEval:
 
 
 class TestSplitIntoKFolds:
-    pass
-    # TODO: test folds & contents types
-    # TODO: test folds sizes
-    # TODO: test non-overlappingness of df_train, df_eval in each fold
-    # TODO: test non-overlappingness of df_evals for different folds
-    # TODO: test validation: stratification by float column
-    # TODO: test validation: stratification, rel_size_deviation_tolerance
+    @pytest.mark.parametrize("as_lazy", [False, True])
+    @pytest.mark.parametrize("k", [3, 5])
+    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize("shuffle", [False, True])
+    def test_output_types_e_sizes_inputting_df_ubools(
+        self,
+        df_ubools,
+        k,
+        as_lazy,
+        stratify_by,
+        shuffle,
+    ):
+        n_input = 400
+        df_input = df_ubools(from_lazy=False, n=n_input, seed=SEED)
+
+        rel_size_deviation_tolerance = 0.1
+
+        folds = split_into_k_folds(
+            df=df_input,
+            k=k,
+            stratify_by=stratify_by,
+            shuffle=shuffle,
+            seed=SEED,
+            as_lazy=as_lazy,
+            as_dict=True,
+            validate=True,  # TODO: try true
+            rel_size_deviation_tolerance=rel_size_deviation_tolerance,
+        )
+
+        check.is_instance(folds, list)
+        check.is_true(len(folds) == k)
+
+        for fold in folds:
+            check.is_instance(fold, dict)
+
+            if as_lazy:
+                check.is_instance(fold["train"], LazyFrame)
+                check.is_instance(fold["eval"], LazyFrame)
+
+                df_train, df_eval = fold["train"].collect(), fold["eval"].collect()
+
+            elif not as_lazy:
+                check.is_instance(fold["train"], DataFrame)
+                check.is_instance(fold["eval"], DataFrame)
+
+                df_train, df_eval = fold["train"], fold["eval"]
+
+            expected_eval_size = int(n_input / k)
+            check.almost_equal(df_train.shape[0], n_input - expected_eval_size, rel=rel_size_deviation_tolerance)
+            check.almost_equal(df_eval.shape[0], expected_eval_size, rel=rel_size_deviation_tolerance)
+
+            # intra-fold non-overlappingness: df_train, df_eval
+            if not as_lazy and not shuffle:
+                check.is_true(fold["train"].shape[0] + fold["eval"].shape[0] == n_input)
+
+                df_concat = concat([fold["train"], fold["eval"]])
+                n_duplicates = df_concat.is_duplicated().sum()
+                check.is_true(n_duplicates == 0)
+
+        # inter-fold non-overlappingness: df_evals
+        if not as_lazy and not shuffle:
+            df_evals = concat([fold["eval"] for fold in folds])
+            n_duplicates = df_evals.is_duplicated().sum()
+            check.is_true(n_duplicates == 0)
+
+    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    def test_stratification_inputting_df_ubools(self, df_ubools, stratify_by):
+        n_input = 400
+        df_input = df_ubools(from_lazy=False, n=n_input, seed=SEED)
+
+        folds = split_into_k_folds(
+            df=df_input,
+            k=3,
+            stratify_by=stratify_by,
+            shuffle=False,
+            seed=SEED,
+            as_lazy=False,
+            as_dict=True,
+            validate=True,
+            rel_size_deviation_tolerance=0.1,
+        )
+
+        for k, fold in enumerate(folds):
+            df_train, df_eval = fold["train"], fold["eval"]
+            eval_size_modifier = 1 if k > 1 else 0
+            if stratify_by is None:
+                # results should not (necessarily) be stratified
+                logger.debug(f"k: {k}, {Counter(df_train['treatment'])}, {Counter(df_eval['treatment'])}")
+                check.not_equal(
+                    Counter(df_train["treatment"]), Counter({0: 133 + eval_size_modifier, 1: 133 + eval_size_modifier})
+                )
+                check.not_equal(
+                    Counter(df_eval["treatment"]), Counter({0: 67 - eval_size_modifier, 1: 67 - eval_size_modifier})
+                )
+
+            elif stratify_by == "treatment":
+                # results should be well stratified according to treatment
+                logger.debug(f"k: {k}, {Counter(df_train['treatment'])}, {Counter(df_eval['treatment'])}")
+                check.equal(
+                    Counter(df_train["treatment"]), Counter({0: 133 + eval_size_modifier, 1: 133 + eval_size_modifier})
+                )
+                check.equal(
+                    Counter(df_eval["treatment"]), Counter({0: 67 - eval_size_modifier, 1: 67 - eval_size_modifier})
+                )
+
+            elif stratify_by == ["treatment", "outcome"]:
+                logger.debug(
+                    f"k: {k}, {Counter(zip(df_train['treatment'], df_train['outcome']))}, {Counter(zip(df_eval['treatment'], df_eval['outcome']))}"
+                )
+                # results should be well stratified according to treatment & outcome...
+                check.equal(
+                    Counter(zip(df_train["treatment"], df_train["outcome"])),
+                    Counter({(0, 0): 67, (0, 1): 67, (1, 0): 67, (1, 1): 67}),
+                )
+                check.equal(
+                    Counter(zip(df_eval["treatment"], df_eval["outcome"])),
+                    Counter({(0, 0): 33, (0, 1): 33, (1, 0): 33, (1, 1): 33}),
+                )
+
+                # ...as well as according to treatment and outcome individually
+                check.equal(Counter(df_train["treatment"]), Counter({0: 134, 1: 134}))
+                check.equal(Counter(df_eval["treatment"]), Counter({0: 66, 1: 66}))
