@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Optional
 
 import polars as pl
 import pytest
@@ -12,8 +12,8 @@ from tests.utils.data_generators import (
 def df_ubools():
     """Build a dataframe with two boolean columns that are both marginally and jointly uniformly distributed."""
 
-    def _df(from_lazy: bool = False, n: int = 400):
-        treatment_outcome_pairs = get_uniformly_distributed_combinations_of_two_bools(n=n)
+    def _df(from_lazy: bool = False, n: int = 400, seed: Optional[int] = 273):
+        treatment_outcome_pairs = get_uniformly_distributed_combinations_of_two_bools(n=n, seed=seed)
         df_lazy = pl.LazyFrame(
             {
                 "row_num_as_float": [float(row_num) for row_num in range(n)],

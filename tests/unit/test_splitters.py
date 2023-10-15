@@ -6,7 +6,7 @@ from pytest_check import check
 
 from polars_splitters.core.splitters import split_into_k_folds, split_into_train_eval
 
-SEED = 273
+SEED = 173
 
 
 class TestSplitIntoTrainEval:
@@ -145,7 +145,7 @@ class TestSplitIntoTrainEval:
         n_input = 400
         eval_rel_size = 0.3
         result = split_into_train_eval(
-            df=df_ubools(from_lazy=False, n=n_input),
+            df=df_ubools(from_lazy=False, n=n_input, seed=SEED),
             eval_rel_size=eval_rel_size,
             stratify_by=stratify_by,
             shuffle=False,
@@ -157,30 +157,38 @@ class TestSplitIntoTrainEval:
         )
 
         if stratify_by is None:
-            check.equal(Counter(result["train"]["treatment"]), Counter({0: 141, 1: 139}))
-            check.equal(Counter(result["eval"]["treatment"]), Counter({1: 61, 0: 59}))
+            # results should not (necessarily) be stratified
+            check.equal(Counter(result["train"]["treatment"]), Counter({0: 132, 1: 148}))
+            check.equal(Counter(result["eval"]["treatment"]), Counter({0: 68, 1: 52}))
         elif stratify_by == "treatment":
-            check.equal(Counter(result["train"]["treatment"]), Counter({1: 140, 0: 140}))
+            # results should be well stratified according to treatment...
+            check.equal(Counter(result["train"]["treatment"]), Counter({0: 140, 1: 140}))
             check.equal(Counter(result["eval"]["treatment"]), Counter({0: 60, 1: 60}))
 
+            # ...but not necessarily according to treatment & outcome
             check.equal(
                 Counter(zip(result["train"]["treatment"], result["train"]["outcome"])),
-                Counter({(1, 0): 67, (0, 1): 68, (0, 0): 72, (1, 1): 73}),
+                Counter({(0, 0): 69, (0, 1): 71, (1, 0): 72, (1, 1): 68}),
             )
             check.equal(
                 Counter(zip(result["eval"]["treatment"], result["eval"]["outcome"])),
-                Counter({(1, 0): 33, (0, 1): 32, (0, 0): 28, (1, 1): 27}),
+                Counter({(0, 0): 31, (0, 1): 29, (1, 0): 28, (1, 1): 32}),
             )
-            check.equal(Counter(result["eval"]["treatment"]), Counter({0: 60, 1: 60}))
+
         elif stratify_by == ["treatment", "outcome"]:
+            # results should be well stratified according to treatment & outcome...
             check.equal(
                 Counter(zip(result["train"]["treatment"], result["train"]["outcome"])),
-                Counter({(0, 1): 70, (1, 0): 70, (0, 0): 70, (1, 1): 70}),
+                Counter({(0, 0): 70, (0, 1): 70, (1, 0): 70, (1, 1): 70}),
             )
             check.equal(
                 Counter(zip(result["eval"]["treatment"], result["eval"]["outcome"])),
-                Counter({(1, 0): 30, (0, 0): 30, (1, 1): 30, (0, 1): 30}),
+                Counter({(0, 0): 30, (0, 1): 30, (1, 0): 30, (1, 1): 30}),
             )
+
+            # ...as well as according to treatment and outcome individually
+            check.equal(Counter(result["train"]["treatment"]), Counter({0: 140, 1: 140}))
+            check.equal(Counter(result["eval"]["treatment"]), Counter({0: 60, 1: 60}))
 
 
 class TestSplitIntoKFolds:
