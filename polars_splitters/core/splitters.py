@@ -131,7 +131,12 @@ def split_into_k_folds(
     as_dict: Optional[bool] = False,
     validate: Optional[bool] = True,
     rel_size_deviation_tolerance: Optional[float] = 0.1,
-) -> Tuple[df_pl, df_pl]:
+) -> (
+    List[Tuple[LazyFrame, LazyFrame]]
+    | List[Tuple[DataFrame, DataFrame]]
+    | List[Dict[str, LazyFrame]]
+    | List[Dict[str, DataFrame]]
+):
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
 
     return _split_into_k_train_eval_folds(
@@ -163,6 +168,8 @@ def _split_into_k_train_eval_folds(
 ) -> (
     Tuple[LazyFrame, LazyFrame]
     | Tuple[DataFrame, DataFrame]
+    | Dict[str, LazyFrame]
+    | Dict[str, DataFrame]
     | List[Tuple[LazyFrame, LazyFrame]]
     | List[Tuple[DataFrame, DataFrame]]
     | List[Dict[str, LazyFrame]]
