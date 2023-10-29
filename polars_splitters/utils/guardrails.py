@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Callable, Tuple
+from typing import Callable, Optional, Tuple
 
 from loguru import logger
 from polars import FLOAT_DTYPES, Int64, LazyFrame, count
@@ -36,7 +36,7 @@ def get_lazyframe_size(df: LazyFrame) -> int:
 
 
 def validate_var_within_bounds(
-    var: float, bounds: Tuple[float | None, float | None] | Tuple[int | None, int | None]
+    var: float, bounds: Tuple[Optional[float | int], Optional[float | int]]
 ) -> Exception | None:
     """Ensure that the variable is within the specified bounds."""
 
