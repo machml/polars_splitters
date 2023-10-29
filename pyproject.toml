@@ -1,21 +1,20 @@
 [tool.poetry]
 name = "polars_splitters"
-version = "0.1.0"
+version = "0.1.1"
 description = ""
-authors = ["Jonas M. Miguel <Jonas M. Miguel>"]
+authors = ["Jonas M. Miguel <charter-shushes0n@icloud.com>"]
 readme = "README.md"
 packages = [{ include = "polars_splitters" }]
 
 [tool.poetry.dependencies]
-python = ">3.9, <4.0"
+python = ">=3.10.9, <4.0"
 polars = "^0.19.3"
 loguru = "^0.7.2"
-pytest = "^7.4.2"
-pytest-check = "^2.2.2"
-
 
 [tool.poetry.group.dev.dependencies]
-ipykernel = "^6.25.2"
+pytest = "^7.4.2"
+pytest-check = "^2.2.2"
+ipykernel = "^6.26.0"
 
 [build-system]
 requires = ["poetry-core"]
