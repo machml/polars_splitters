@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "polars_splitters"
 version = "0.1.2"
-description = ""
+description = "Polars-based splitter functionalities for polars LazyFrames and DataFrames similar to `sklearn.model_selection.train_test_split` and `sklearn.model_selection.StratifiedKFold`."
 authors = ["Jonas M. Miguel <charter-shushes0n@icloud.com>"]
 readme = "README.md"
 packages = [{ include = "polars_splitters" }]
