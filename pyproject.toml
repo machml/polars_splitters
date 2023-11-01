@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "polars_splitters"
-version = "0.1.1"
+version = "0.1.2"
 description = ""
 authors = ["Jonas M. Miguel <charter-shushes0n@icloud.com>"]
 readme = "README.md"
@@ -9,7 +9,7 @@ packages = [{ include = "polars_splitters" }]
 [tool.poetry.dependencies]
 python = ">=3.10.9, <4.0"
 polars = "^0.19.3"
-loguru = "^0.7.2"
+loguru = "^0.6.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
