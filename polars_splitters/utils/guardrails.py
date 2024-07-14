@@ -104,7 +104,7 @@ def validate_splitting(func: Callable) -> Callable:
                 n_strata = df.select(stratify_by).collect().n_unique()
 
                 eval_size_targeted = (
-                    df.select((eval_rel_size_ * count()).round(0).clip_min(1).cast(Int64)).collect().item()
+                    df.select((eval_rel_size_ * count()).round(0).clip(lower_bound=1).cast(Int64)).collect().item()
                 )
 
                 if eval_rel_size_ <= 0.5:

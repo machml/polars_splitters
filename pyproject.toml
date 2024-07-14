@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "polars_splitters"
-version = "0.1.2"
+version = "0.2.0"
 description = "Polars-based splitter functionalities for polars LazyFrames and DataFrames similar to `sklearn.model_selection.train_test_split` and `sklearn.model_selection.StratifiedKFold`."
 authors = ["Jonas M. Miguel <charter-shushes0n@icloud.com>"]
 readme = "README.md"
@@ -8,13 +8,12 @@ packages = [{ include = "polars_splitters" }]
 
 [tool.poetry.dependencies]
 python = ">=3.10.9, <4.0"
-polars = "^0.19.3"
-loguru = "^0.6.0"
+polars = ">=1.1.0"
+loguru = ">=0.7.2"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.4.2"
-pytest-check = "^2.2.2"
-ipykernel = "^6.26.0"
+pytest = ">=8.2.2"
+pytest-check = ">=2.3.1"
 
 [build-system]
 requires = ["poetry-core"]

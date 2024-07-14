@@ -278,7 +278,7 @@ def _split_into_k_train_eval_folds(
     if k > 1:  # k-fold
         eval_rel_size = 1 / k
 
-    eval_size = (eval_rel_size * count()).round(0).clip_min(1).cast(Int64)
+    eval_size = (eval_rel_size * count()).round(0).clip(lower_bound=1).cast(Int64)
 
     if stratify_by:
         idxs = idxs.over(stratify_by)
