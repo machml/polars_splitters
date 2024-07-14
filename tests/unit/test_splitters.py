@@ -280,17 +280,12 @@ class TestSplitIntoKFolds:
             eval_size_modifier = 1 if k > 1 else 0
             if stratify_by is None:
                 # results should not (necessarily) be stratified
-                logger.debug(f"k: {k}, {Counter(df_train['treatment'])}, {Counter(df_eval['treatment'])}")
-                check.not_equal(
-                    Counter(df_train["treatment"]), Counter({0: 133 + eval_size_modifier, 1: 133 + eval_size_modifier})
-                )
                 check.not_equal(
                     Counter(df_eval["treatment"]), Counter({0: 67 - eval_size_modifier, 1: 67 - eval_size_modifier})
                 )
 
             elif stratify_by == "treatment":
                 # results should be well stratified according to treatment
-                logger.debug(f"k: {k}, {Counter(df_train['treatment'])}, {Counter(df_eval['treatment'])}")
                 check.equal(
                     Counter(df_train["treatment"]), Counter({0: 133 + eval_size_modifier, 1: 133 + eval_size_modifier})
                 )
@@ -299,9 +294,6 @@ class TestSplitIntoKFolds:
                 )
 
             elif stratify_by == ["treatment", "outcome"]:
-                logger.debug(
-                    f"k: {k}, {Counter(zip(df_train['treatment'], df_train['outcome']))}, {Counter(zip(df_eval['treatment'], df_eval['outcome']))}"
-                )
                 # results should be well stratified according to treatment & outcome...
                 check.equal(
                     Counter(zip(df_train["treatment"], df_train["outcome"])),

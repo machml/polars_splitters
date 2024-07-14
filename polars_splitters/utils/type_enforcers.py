@@ -14,7 +14,7 @@ def ensure_type(var: Any, to_type: type, warn: bool = False) -> Any:
         return var
 
     if warn:
-        logger.debug(f"Converting from {from_type} to {to_type}.")
+        logger.info(f"Converting from {from_type} to {to_type}.")
 
     if (from_type, to_type) == (LazyFrame, DataFrame):
         return var.collect()

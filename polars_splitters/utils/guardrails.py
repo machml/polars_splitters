@@ -112,12 +112,6 @@ def validate_splitting(func: Callable) -> Callable:
                 else:
                     smallest_set, smallest_set_size = ("train", input_size - eval_size_targeted)
 
-                logger.debug(
-                    f"""input_size: {input_size}, eval_size_targeted: {eval_size_targeted}, train_size_targeted: {input_size - eval_size_targeted}
-                        smallest_set: {smallest_set}, smallest_set_size: {smallest_set_size}, n_strata: {n_strata}, stratify_by: {stratify_by}
-                        """
-                )
-
                 if smallest_set_size < n_strata:
                     f"""
                     Unable to generate the data splits for the data df and the configuration attempted for {_get_eval_sizing_measure(k)} and stratify_by.
@@ -142,7 +136,7 @@ def validate_splitting(func: Callable) -> Callable:
 
                 rel_size_deviation = abs(eval_rel_size_actual - eval_rel_size_)
 
-                logger.debug(
+                logger.info(
                     f"fold {i}/{k}, k: {k}, eval_rel_size: {eval_rel_size_}, eval_rel_size_actual: {eval_rel_size_actual}, rel_size_deviation_tolerance: {rel_size_deviation_tolerance}, rel_size_deviation: {rel_size_deviation}"
                 )
 
