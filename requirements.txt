@@ -1,0 +1,4 @@
+loguru==0.7.2
+polars==1.1.0
+pytest==8.2.2
+pytest_check==2.3.1
