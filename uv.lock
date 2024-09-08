@@ -1,5 +1,5 @@
 version = 1
-requires-python = ">=3.10"
+requires-python = ">=3.10, <3.12"
 
 [[package]]
 name = "colorama"
@@ -74,21 +74,25 @@ wheels = [
 
 [[package]]
 name = "polars-splitters"
-version = "0.1.0"
+version = "0.2.3"
 source = { editable = "." }
 dependencies = [
     { name = "loguru" },
     { name = "polars" },
+]
+
+[package.optional-dependencies]
+test = [
     { name = "pytest" },
     { name = "pytest-check" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "loguru", specifier = "==0.7.2" },
-    { name = "polars", specifier = "==1.1.0" },
-    { name = "pytest", specifier = "==8.2.2" },
-    { name = "pytest-check", specifier = "==2.3.1" },
+    { name = "loguru", specifier = ">=0.7.2" },
+    { name = "polars", specifier = ">=1.1.0,<=1.6.0" },
+    { name = "pytest", marker = "extra == 'test'", specifier = "==8.2.2" },
+    { name = "pytest-check", marker = "extra == 'test'", specifier = "==2.3.1" },
 ]
 
 [[package]]

@@ -1,11 +1,11 @@
 [project]
 name = "polars-splitters"
-version = "0.2.2"
+version = "0.2.3"
 description = "Polars-based splitter functionalities for polars LazyFrames and DataFrames, similar to `sklearn.model_selection.train_test_split` and `sklearn.model_selection.StratifiedKFold`."
 authors = [{ name = "Jonas M. Miguel", email = "charter-shushes0n@icloud.com" }]
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = ["loguru==0.7.2", "polars==1.1.0"]
+requires-python = ">=3.10, <3.12"
+dependencies = ["loguru>=0.7.2", "polars >=1.1.0, <=1.6.0"]
 
 [project.optional-dependencies]
 test = ["pytest==8.2.2", "pytest-check==2.3.1"]
