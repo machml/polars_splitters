@@ -138,7 +138,7 @@ def validate_splitting(func: Callable) -> Callable:
                 rel_size_deviation = abs(eval_rel_size_actual - eval_rel_size_)
 
                 logger.info(
-                    f"fold {i}/{k}, k: {k}, eval_rel_size: {eval_rel_size_}, eval_rel_size_actual: {eval_rel_size_actual}, rel_size_deviation_tolerance: {rel_size_deviation_tolerance}, rel_size_deviation: {rel_size_deviation}"
+                    f"fold {i+1}/{k}, k: {k}, eval_rel_size: {eval_rel_size_}, eval_rel_size_actual: {eval_rel_size_actual}, rel_size_deviation_tolerance: {rel_size_deviation_tolerance}, rel_size_deviation: {rel_size_deviation}"
                 )
 
                 if rel_size_deviation > rel_size_deviation_tolerance + 1e-6:
