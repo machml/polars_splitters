@@ -1,7 +1,8 @@
 from typing import Dict, List, Literal, Optional, Tuple, overload
 
 from loguru import logger
-from polars import DataFrame, Int64, LazyFrame, count, int_range
+from polars import DataFrame, Int64, LazyFrame, int_range
+from polars import len as pl_len
 
 from polars_splitters.utils.guardrails import (
     enforce_input_outputs_expected_types,
@@ -271,14 +272,14 @@ def _split_into_k_train_eval_folds(
 ):
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
 
-    idxs = int_range(0, count())
+    idxs = int_range(0, pl_len())
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
 
     if k > 1:  # k-fold
         eval_rel_size = 1 / k
 
-    eval_size = (eval_rel_size * count()).round(0).clip(lower_bound=1).cast(Int64)
+    eval_size = (eval_rel_size * pl_len()).round(0).clip(lower_bound=1).cast(Int64)
 
     if stratify_by:
         idxs = idxs.over(stratify_by)

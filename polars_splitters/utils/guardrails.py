@@ -2,7 +2,8 @@ from functools import wraps
 from typing import Callable, Optional, Tuple
 
 from loguru import logger
-from polars import FLOAT_DTYPES, Int64, LazyFrame, count
+from polars import FLOAT_DTYPES, Int64, LazyFrame
+from polars import len as pl_len
 from polars import selectors as cs
 
 from polars_splitters.utils.wrapping_helpers import get_arg_value, replace_arg_value
@@ -32,7 +33,7 @@ def _get_eval_sizing_measure(k: int) -> str:
 
 
 def get_lazyframe_size(df: LazyFrame) -> int:
-    return df.select(count()).collect().item()
+    return df.select(pl_len()).collect().item()
 
 
 def validate_var_within_bounds(
@@ -104,7 +105,7 @@ def validate_splitting(func: Callable) -> Callable:
                 n_strata = df.select(stratify_by).collect().n_unique()
 
                 eval_size_targeted = (
-                    df.select((eval_rel_size_ * count()).round(0).clip(lower_bound=1).cast(Int64)).collect().item()
+                    df.select((eval_rel_size_ * pl_len()).round(0).clip(lower_bound=1).cast(Int64)).collect().item()
                 )
 
                 if eval_rel_size_ <= 0.5:
