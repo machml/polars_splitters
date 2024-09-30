@@ -92,7 +92,9 @@ def validate_splitting(func: Callable) -> Callable:
 
             if stratify_by:
                 # validate stratification dtypes
-                stratification_columns_of_float_type = df.select(stratify_by).select(cs.by_dtype(FLOAT_DTYPES)).schema
+                stratification_columns_of_float_type = (
+                    df.select(stratify_by).select(cs.by_dtype(FLOAT_DTYPES)).collect_schema()
+                )
                 if stratification_columns_of_float_type:
                     raise NotImplementedError(
                         f"""
