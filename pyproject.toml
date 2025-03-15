@@ -5,7 +5,7 @@ description = "Polars-based splitter functionalities for polars LazyFrames and D
 authors = [{ name = "Jonas M. Miguel", email = "charter-shushes0n@icloud.com" }]
 readme = "README.md"
 requires-python = ">=3.10, <3.12"
-dependencies = ["loguru>=0.7.2", "polars >=1.11.0, <=2.0.0"]
+dependencies = ["loguru>=0.7.2", "polars>=1.24.0, <=2.0.0"]
 
 [project.optional-dependencies]
 test = ["pytest==8.2.2", "pytest-check==2.3.1"]
