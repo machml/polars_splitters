@@ -293,3 +293,10 @@ def _split_into_k_train_eval_folds(
         folds[i] = {"train": df.filter(~is_eval), "eval": df.filter(is_eval)}
 
     return folds
+
+
+def get_stratified_sample(df: DataFrame, fraction: float, stratify_by: str | List[str], seed: int = 173) -> DataFrame:
+    _, df_sample = split_into_train_eval(
+        df, eval_rel_size=fraction, stratify_by=stratify_by, shuffle=True, as_lazy=False, seed=seed
+    )
+    return df_sample
