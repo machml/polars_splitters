@@ -91,18 +91,6 @@ def validate_splitting(func: Callable) -> Callable:
             input_size = get_lazyframe_size(df)
 
             if stratify_by:
-                # validate stratification dtypes
-                stratification_columns_of_float_type = (
-                    df.select(stratify_by).select(cs.by_dtype(FLOAT_DTYPES)).collect_schema()
-                )
-                if stratification_columns_of_float_type:
-                    raise NotImplementedError(
-                        f"""
-                            Attempted to stratify based on float column(s): {stratification_columns_of_float_type}.
-                            This is not currently supported. Consider discretizing the column first or using a different column.
-                        """
-                    )
-
                 # validate stratification feasibility (size_input, eval_rel_size (or k), n_strata, stratify_by)
                 n_strata = df.select(stratify_by).collect().n_unique()
 

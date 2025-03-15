@@ -1,8 +1,9 @@
-from typing import Dict, List, Literal, Optional, Tuple, overload
+from typing import Literal, overload
 
 from loguru import logger
-from polars import DataFrame, Int64, LazyFrame, int_range
+from polars import DataFrame, Int64, LazyFrame, col, int_range
 from polars import len as pl_len
+from polars import selectors as cs
 
 from polars_splitters.utils.guardrails import (
     enforce_input_outputs_expected_types,
@@ -12,24 +13,24 @@ from polars_splitters.utils.guardrails import (
 df_pl = DataFrame | LazyFrame
 
 __all__ = [
-    "split_into_train_eval",
     "split_into_k_folds",
+    "split_into_train_eval",
 ]
 
 
 def split_into_train_eval(
     df: LazyFrame | DataFrame,
     eval_rel_size: float,
-    stratify_by: Optional[str | List[str]] = None,
-    shuffle: Optional[bool] = True,
-    seed: Optional[int] = 273,
-    as_lazy: Optional[bool] = False,
-    as_dict: Optional[bool] = False,
-    validate: Optional[bool] = True,
-    rel_size_deviation_tolerance: Optional[float] = 0.1,
-) -> Tuple[LazyFrame, LazyFrame] | Tuple[DataFrame, DataFrame] | Dict[str, LazyFrame] | Dict[str, DataFrame]:
-    r"""
-    Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
+    stratify_by: str | list[str] | None = None,
+    float_qbins: int | dict[str, int] = 10,
+    shuffle: bool | None = True,
+    seed: int | None = 273,
+    as_lazy: bool | None = False,
+    as_dict: bool | None = False,
+    validate: bool | None = True,
+    rel_size_deviation_tolerance: float | None = 0.1,
+) -> tuple[LazyFrame, LazyFrame] | tuple[DataFrame, DataFrame] | dict[str, LazyFrame] | dict[str, DataFrame]:
+    r"""Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
     It includes logging and some guardrails: type coercion as well as validation for the inputs and outputs.
 
     Parameters
@@ -38,7 +39,7 @@ def split_into_train_eval(
         The polars DataFrame to split.
     eval_rel_size : float
         The targeted relative size of the eval set. Must be between 0.0 and 1.0.
-    stratify_by : str | List[str], optional. Defaults to None.
+    stratify_by : str | list[str], optional. Defaults to None.
         The column names to use for stratification.
         If None (default), stratification is not performed. Note: Stratification by float columns is not currently supported.
     shuffle : bool, optional. Defaults to True.
@@ -58,7 +59,7 @@ def split_into_train_eval(
 
     Returns
     -------
-    Tuple[LazyFrame, LazyFrame] | Tuple[DataFrame, DataFrame] | Dict[str, LazyFrame] | Dict[str, DataFrame]
+    tuple[LazyFrame, LazyFrame] | tuple[DataFrame, DataFrame] | dict[str, LazyFrame] | dict[str, DataFrame]
         df_train and df_eval, either as a tuple or as a dictionary, and either as LazyFrames or DataFrames, depending on the values of as_dict and as_lazy.
 
     Raises
@@ -77,10 +78,12 @@ def split_into_train_eval(
     ...     {
     ...         "feature_1": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
     ...         "treatment": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-    ...         "outcome":   [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+    ...         "outcome": [0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
     ...     }
     ... )
-    >>> df_train, df_eval = split_into_train_eval(df, eval_rel_size=0.3, stratify_by=["treatment", "outcome"], shuffle=True, as_lazy=False)
+    >>> df_train, df_eval = split_into_train_eval(
+    ...     df, eval_rel_size=0.3, stratify_by=["treatment", "outcome"], shuffle=True, as_lazy=False
+    ... )
     >>> print(df_train, df_eval, sep="\n\n")
     shape: (7, 3)
     ┌───────────┬───────────┬─────────┐
@@ -107,12 +110,14 @@ def split_into_train_eval(
     │ 6.0       ┆ 1         ┆ 0       │
     │ 10.0      ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
+
     """
     return _split_into_k_train_eval_folds(
         df=df,
         eval_rel_size=eval_rel_size,
         k=1,
         stratify_by=stratify_by,
+        float_qbins=float_qbins,
         shuffle=shuffle,
         seed=seed,
         as_lazy=as_lazy,
@@ -124,27 +129,28 @@ def split_into_train_eval(
 
 def split_into_k_folds(
     df: LazyFrame | DataFrame,
-    k: Optional[int] = 1,
-    stratify_by: Optional[str | List[str]] = None,
-    shuffle: Optional[bool] = True,
-    seed: Optional[int] = 273,
-    as_lazy: Optional[bool] = False,
-    as_dict: Optional[bool] = False,
-    validate: Optional[bool] = True,
-    rel_size_deviation_tolerance: Optional[float] = 0.1,
+    k: int | None = 1,
+    stratify_by: str | list[str] | None = None,
+    float_qbins: int | dict[str, int] = 10,
+    shuffle: bool | None = True,
+    seed: int | None = 273,
+    as_lazy: bool | None = False,
+    as_dict: bool | None = False,
+    validate: bool | None = True,
+    rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    List[Tuple[LazyFrame, LazyFrame]]
-    | List[Tuple[DataFrame, DataFrame]]
-    | List[Dict[str, LazyFrame]]
-    | List[Dict[str, DataFrame]]
+    list[tuple[LazyFrame, LazyFrame]]
+    | list[tuple[DataFrame, DataFrame]]
+    | list[dict[str, LazyFrame]]
+    | list[dict[str, DataFrame]]
 ):
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
-
     return _split_into_k_train_eval_folds(
         df=df,
         eval_rel_size=None,
         k=k,
         stratify_by=stratify_by,
+        float_qbins=float_qbins,
         shuffle=shuffle,
         seed=seed,
         as_lazy=as_lazy,
@@ -158,94 +164,94 @@ def split_into_k_folds(
 def _split_into_k_train_eval_folds(
     df: LazyFrame | DataFrame,
     eval_rel_size: Literal[None] = ...,
-    k: Optional[int] = 1,
-    stratify_by: Optional[str | List[str]] = None,
-    shuffle: Optional[bool] = True,
-    seed: Optional[int] = 273,
-    as_lazy: Optional[bool] = False,
-    as_dict: Optional[bool] = False,
-    validate: Optional[bool] = True,
-    rel_size_deviation_tolerance: Optional[float] = 0.1,
+    k: int | None = 1,
+    stratify_by: str | list[str] | None = None,
+    float_qbins: int | dict[str, int] = 10,
+    shuffle: bool | None = True,
+    seed: int | None = 273,
+    as_lazy: bool | None = False,
+    as_dict: bool | None = False,
+    validate: bool | None = True,
+    rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    Tuple[LazyFrame, LazyFrame]
-    | Tuple[DataFrame, DataFrame]
-    | Dict[str, LazyFrame]
-    | Dict[str, DataFrame]
-    | List[Tuple[LazyFrame, LazyFrame]]
-    | List[Tuple[DataFrame, DataFrame]]
-    | List[Dict[str, LazyFrame]]
-    | List[Dict[str, DataFrame]]
-):
-    ...
+    tuple[LazyFrame, LazyFrame]
+    | tuple[DataFrame, DataFrame]
+    | dict[str, LazyFrame]
+    | dict[str, DataFrame]
+    | list[tuple[LazyFrame, LazyFrame]]
+    | list[tuple[DataFrame, DataFrame]]
+    | list[dict[str, LazyFrame]]
+    | list[dict[str, DataFrame]]
+): ...
 
 
 @overload
 def _split_into_k_train_eval_folds(
     df: LazyFrame | DataFrame,
     eval_rel_size: float | None = None,
-    k: Optional[int] = 1,
-    stratify_by: Optional[str | List[str]] = None,
-    shuffle: Optional[bool] = True,
-    seed: Optional[int] = 273,
-    as_lazy: Optional[bool] = False,
-    as_dict: Optional[bool] = False,
-    validate: Optional[bool] = True,
-    rel_size_deviation_tolerance: Optional[float] = 0.1,
+    k: int | None = 1,
+    stratify_by: str | list[str] | None = None,
+    float_qbins: int | dict[str, int] = 10,
+    shuffle: bool | None = True,
+    seed: int | None = 273,
+    as_lazy: bool | None = False,
+    as_dict: bool | None = False,
+    validate: bool | None = True,
+    rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    Tuple[LazyFrame, LazyFrame]
-    | Tuple[DataFrame, DataFrame]
-    | List[Tuple[LazyFrame, LazyFrame]]
-    | List[Tuple[DataFrame, DataFrame]]
-    | List[Dict[str, LazyFrame]]
-    | List[Dict[str, DataFrame]]
-):
-    ...
+    tuple[LazyFrame, LazyFrame]
+    | tuple[DataFrame, DataFrame]
+    | list[tuple[LazyFrame, LazyFrame]]
+    | list[tuple[DataFrame, DataFrame]]
+    | list[dict[str, LazyFrame]]
+    | list[dict[str, DataFrame]]
+): ...
 
 
 @overload
 def _split_into_k_train_eval_folds(
     df: LazyFrame | DataFrame,
     eval_rel_size: float | None = None,
-    k: Optional[int] = 1,
-    stratify_by: Optional[str | List[str]] = None,
-    shuffle: Optional[bool] = True,
-    seed: Optional[int] = 273,
-    as_lazy: Optional[bool] = False,
-    as_dict: Optional[bool] = False,
-    validate: Optional[bool] = True,
-    rel_size_deviation_tolerance: Optional[float] = 0.1,
+    k: int | None = 1,
+    stratify_by: str | list[str] | None = None,
+    float_qbins: int | dict[str, int] = 10,
+    shuffle: bool | None = True,
+    seed: int | None = 273,
+    as_lazy: bool | None = False,
+    as_dict: bool | None = False,
+    validate: bool | None = True,
+    rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    Tuple[LazyFrame, LazyFrame]
-    | Tuple[DataFrame, DataFrame]
-    | List[Tuple[LazyFrame, LazyFrame]]
-    | List[Tuple[DataFrame, DataFrame]]
-    | List[Dict[str, LazyFrame]]
-    | List[Dict[str, DataFrame]]
-):
-    ...
+    tuple[LazyFrame, LazyFrame]
+    | tuple[DataFrame, DataFrame]
+    | list[tuple[LazyFrame, LazyFrame]]
+    | list[tuple[DataFrame, DataFrame]]
+    | list[dict[str, LazyFrame]]
+    | list[dict[str, DataFrame]]
+): ...
 
 
 @overload
 def _split_into_k_train_eval_folds(
     df: LazyFrame | DataFrame,
     eval_rel_size: float | None = None,
-    k: Optional[int] = 1,
-    stratify_by: Optional[str | List[str]] = None,
-    shuffle: Optional[bool] = True,
-    seed: Optional[int] = 273,
-    as_lazy: Optional[bool] = False,
-    as_dict: Optional[bool] = False,
-    validate: Optional[bool] = True,
-    rel_size_deviation_tolerance: Optional[float] = 0.1,
+    k: int | None = 1,
+    stratify_by: str | list[str] | None = None,
+    float_qbins: int | dict[str, int] = 10,
+    shuffle: bool | None = True,
+    seed: int | None = 273,
+    as_lazy: bool | None = False,
+    as_dict: bool | None = False,
+    validate: bool | None = True,
+    rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    Tuple[LazyFrame, LazyFrame]
-    | Tuple[DataFrame, DataFrame]
-    | List[Tuple[LazyFrame, LazyFrame]]
-    | List[Tuple[DataFrame, DataFrame]]
-    | List[Dict[str, LazyFrame]]
-    | List[Dict[str, DataFrame]]
-):
-    ...
+    tuple[LazyFrame, LazyFrame]
+    | tuple[DataFrame, DataFrame]
+    | list[tuple[LazyFrame, LazyFrame]]
+    | list[tuple[DataFrame, DataFrame]]
+    | list[dict[str, LazyFrame]]
+    | list[dict[str, DataFrame]]
+): ...
 
 
 @logger.catch
@@ -254,24 +260,24 @@ def _split_into_k_train_eval_folds(
 def _split_into_k_train_eval_folds(
     df: LazyFrame | DataFrame,
     eval_rel_size: float | None = None,
-    k: Optional[int] = 1,
-    stratify_by: Optional[str | List[str]] = None,
-    shuffle: Optional[bool] = True,
-    seed: Optional[int] = 273,
-    as_lazy: Optional[bool] = False,
-    as_dict: Optional[bool] = False,
-    validate: Optional[bool] = True,
-    rel_size_deviation_tolerance: Optional[float] = 0.1,
+    k: int = 1,
+    stratify_by: str | list[str] | None = None,
+    float_qbins: int | dict[str, int] = 10,
+    shuffle: bool | None = True,
+    seed: int | None = 273,
+    as_lazy: bool | None = False,
+    as_dict: bool | None = False,
+    validate: bool | None = True,
+    rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    Tuple[LazyFrame, LazyFrame]
-    | Tuple[DataFrame, DataFrame]
-    | List[Tuple[LazyFrame, LazyFrame]]
-    | List[Tuple[DataFrame, DataFrame]]
-    | List[Dict[str, LazyFrame]]
-    | List[Dict[str, DataFrame]]
+    tuple[LazyFrame, LazyFrame]
+    | tuple[DataFrame, DataFrame]
+    | list[tuple[LazyFrame, LazyFrame]]
+    | list[tuple[DataFrame, DataFrame]]
+    | list[dict[str, LazyFrame]]
+    | list[dict[str, DataFrame]]
 ):
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
-
     idxs = int_range(0, pl_len())
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
@@ -281,7 +287,30 @@ def _split_into_k_train_eval_folds(
 
     eval_size = (eval_rel_size * pl_len()).round(0).clip(lower_bound=1).cast(Int64)
 
+    df_preprocessed = df.clone()
     if stratify_by:
+        float_strat_cols = df.select(cs.float() & cs.by_name(stratify_by)).columns
+
+        if float_strat_cols:
+            logger.info(
+                f"Float columns found among stratify_by columns: {float_strat_cols}. Discretizing these columns into {float_qbins} quantile bins",
+            )
+            if isinstance(float_qbins, int):
+                float_qbins = dict.fromkeys(float_strat_cols, float_qbins)
+
+            df_preprocessed = df.with_columns(
+                [
+                    col(col_name).qcut(float_qbins[col_name]).alias(f"polars_splitters:{col_name}:qcut")
+                    for col_name in float_strat_cols
+                ],
+            )
+
+            stratify_by = [
+                f"polars_splitters:{col_name}:qcut" if col_name in float_strat_cols else col_name
+                for col_name in stratify_by
+            ]
+            logger.debug(f"stratify_by: {stratify_by}")
+
         idxs = idxs.over(stratify_by)
         eval_size = eval_size.over(stratify_by)
 
@@ -290,13 +319,28 @@ def _split_into_k_train_eval_folds(
         is_eval = i * eval_size <= idxs
         is_eval = is_eval & (idxs < (i + 1) * eval_size)
 
-        folds[i] = {"train": df.filter(~is_eval), "eval": df.filter(is_eval)}
+        folds[i] = {
+            "train": df_preprocessed.filter(~is_eval).select(df.columns),
+            "eval": df_preprocessed.filter(is_eval).select(df.columns),
+        }
 
     return folds
 
 
-def get_stratified_sample(df: DataFrame, fraction: float, stratify_by: str | List[str], seed: int = 173) -> DataFrame:
+def get_stratified_sample(
+    df: DataFrame,
+    fraction: float,
+    stratify_by: str | list[str],
+    float_qbins: int | dict[str, int] = 10,
+    seed: int = 173,
+) -> DataFrame:
     _, df_sample = split_into_train_eval(
-        df, eval_rel_size=fraction, stratify_by=stratify_by, shuffle=True, as_lazy=False, seed=seed
+        df,
+        eval_rel_size=fraction,
+        stratify_by=stratify_by,
+        float_qbins=float_qbins,
+        shuffle=True,
+        as_lazy=False,
+        seed=seed,
     )
     return df_sample
