@@ -1,13 +1,13 @@
 import random
 from itertools import product as cartesian_product
-from typing import List, Optional, Tuple
 
 
 def get_uniformly_distributed_combinations_of_two_bools(
-    n: int, k: int = 2, seed: Optional[int] = 273
-) -> Tuple[List[int], List[int]]:
-    """
-    Get all possible combinations of k booleans.
+    n: int,
+    k: int = 2,
+    seed: int | None = 273,
+) -> list[tuple[int, ...]]:
+    """Get all possible combinations of k booleans.
 
     Attention: n must be a multiple of 2 ** k.
     """

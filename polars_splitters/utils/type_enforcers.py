@@ -3,7 +3,7 @@ from typing import Any
 from loguru import logger
 from polars import DataFrame, LazyFrame
 
-__all__ = ["ensure_type", "enforce_type"]
+__all__ = ["enforce_type", "ensure_type"]
 
 
 def ensure_type(var: Any, to_type: type, warn: bool = False) -> Any:
@@ -18,14 +18,13 @@ def ensure_type(var: Any, to_type: type, warn: bool = False) -> Any:
 
     if (from_type, to_type) == (LazyFrame, DataFrame):
         return var.collect()
-    elif (from_type, to_type) == (DataFrame, LazyFrame):
+    if (from_type, to_type) == (DataFrame, LazyFrame):
         return var.lazy()
-    elif (from_type, to_type) == (dict, tuple):
+    if (from_type, to_type) == (dict, tuple):
         return tuple(var.values())
-    elif to_type == list:
+    if to_type == list:
         return [var]
-    else:
-        raise NotImplementedError(f"Cannot enforce a {from_type} into a {to_type}.")
+    raise NotImplementedError(f"Cannot enforce a {from_type} into a {to_type}.")
 
 
 enforce_type = ensure_type

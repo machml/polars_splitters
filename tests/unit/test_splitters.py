@@ -1,7 +1,6 @@
 from collections import Counter
 
 import pytest
-from loguru import logger
 from polars import DataFrame, LazyFrame, concat
 from pytest_check import check
 
@@ -13,7 +12,10 @@ SEED = 173
 class TestSplitIntoTrainEval:
     @pytest.mark.parametrize("from_lazy", [False, True])
     @pytest.mark.parametrize("eval_rel_size, expected_eval_size", [(0.3, 3), (0.4, 4)])
-    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize(
+        "stratify_by",
+        [None, "treatment", ["treatment", "outcome"]],
+    )
     @pytest.mark.parametrize("shuffle", [False, True])
     @pytest.mark.parametrize("as_lazy", [False, True])
     @pytest.mark.parametrize("as_dict", [False, True])
@@ -74,7 +76,9 @@ class TestSplitIntoTrainEval:
 
         # non-overlappingness of df_train, df_eval
         if not from_lazy and as_dict and not as_lazy and not shuffle:
-            check.is_true(result["train"].shape[0] + result["eval"].shape[0] == df_basic(from_lazy).shape[0])
+            check.is_true(
+                result["train"].shape[0] + result["eval"].shape[0] == df_basic(from_lazy).shape[0],
+            )
 
             df_concat = concat([result["train"], result["eval"]])
             n_duplicates = df_concat.is_duplicated().sum()
@@ -83,7 +87,10 @@ class TestSplitIntoTrainEval:
     @pytest.mark.parametrize("from_lazy", [False, True])
     @pytest.mark.parametrize("n_input", [400])
     @pytest.mark.parametrize("eval_rel_size", [0.3, 0.4])
-    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize(
+        "stratify_by",
+        [None, "treatment", ["treatment", "outcome"]],
+    )
     @pytest.mark.parametrize("shuffle", [False, True])
     def test_output_sizes_inputting_df_ubools(
         self,
@@ -111,7 +118,10 @@ class TestSplitIntoTrainEval:
         check.is_true(df_train.shape == (n_input - expected_eval_size, 5))
         check.is_true(df_eval.shape == (expected_eval_size, 5))
 
-    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize(
+        "stratify_by",
+        [None, "treatment", ["treatment", "outcome"]],
+    )
     def test_stratification_inputting_basic_df(self, df_basic, stratify_by):
         result = split_into_train_eval(
             df=df_basic(from_lazy=False),
@@ -133,15 +143,30 @@ class TestSplitIntoTrainEval:
             check.equal(Counter(result["eval"]["treatment"]), Counter({1: 2, 0: 1}))
         elif stratify_by == ["treatment", "outcome"]:
             check.equal(
-                Counter(zip(result["train"]["treatment"], result["train"]["outcome"])),
+                Counter(
+                    zip(
+                        result["train"]["treatment"],
+                        result["train"]["outcome"],
+                        strict=False,
+                    ),
+                ),
                 Counter({(0, 0): 3, (1, 0): 2, (1, 1): 2}),
             )
             check.equal(
-                Counter(zip(result["eval"]["treatment"], result["eval"]["outcome"])),
+                Counter(
+                    zip(
+                        result["eval"]["treatment"],
+                        result["eval"]["outcome"],
+                        strict=False,
+                    ),
+                ),
                 Counter({(0, 0): 1, (1, 0): 1, (1, 1): 1}),
             )
 
-    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize(
+        "stratify_by",
+        [None, "treatment", ["treatment", "outcome"]],
+    )
     def test_stratification_inputting_df_ubools(self, df_ubools, stratify_by):
         n_input = 400
         eval_rel_size = 0.3
@@ -159,43 +184,79 @@ class TestSplitIntoTrainEval:
 
         if stratify_by is None:
             # results should not (necessarily) be stratified
-            check.equal(Counter(result["train"]["treatment"]), Counter({0: 132, 1: 148}))
+            check.equal(
+                Counter(result["train"]["treatment"]),
+                Counter({0: 132, 1: 148}),
+            )
             check.equal(Counter(result["eval"]["treatment"]), Counter({0: 68, 1: 52}))
         elif stratify_by == "treatment":
             # results should be well stratified according to treatment...
-            check.equal(Counter(result["train"]["treatment"]), Counter({0: 140, 1: 140}))
+            check.equal(
+                Counter(result["train"]["treatment"]),
+                Counter({0: 140, 1: 140}),
+            )
             check.equal(Counter(result["eval"]["treatment"]), Counter({0: 60, 1: 60}))
 
             # ...but not necessarily according to treatment & outcome
             check.equal(
-                Counter(zip(result["train"]["treatment"], result["train"]["outcome"])),
+                Counter(
+                    zip(
+                        result["train"]["treatment"],
+                        result["train"]["outcome"],
+                        strict=False,
+                    ),
+                ),
                 Counter({(0, 0): 69, (0, 1): 71, (1, 0): 72, (1, 1): 68}),
             )
             check.equal(
-                Counter(zip(result["eval"]["treatment"], result["eval"]["outcome"])),
+                Counter(
+                    zip(
+                        result["eval"]["treatment"],
+                        result["eval"]["outcome"],
+                        strict=False,
+                    ),
+                ),
                 Counter({(0, 0): 31, (0, 1): 29, (1, 0): 28, (1, 1): 32}),
             )
 
         elif stratify_by == ["treatment", "outcome"]:
             # results should be well stratified according to treatment & outcome...
             check.equal(
-                Counter(zip(result["train"]["treatment"], result["train"]["outcome"])),
+                Counter(
+                    zip(
+                        result["train"]["treatment"],
+                        result["train"]["outcome"],
+                        strict=False,
+                    ),
+                ),
                 Counter({(0, 0): 70, (0, 1): 70, (1, 0): 70, (1, 1): 70}),
             )
             check.equal(
-                Counter(zip(result["eval"]["treatment"], result["eval"]["outcome"])),
+                Counter(
+                    zip(
+                        result["eval"]["treatment"],
+                        result["eval"]["outcome"],
+                        strict=False,
+                    ),
+                ),
                 Counter({(0, 0): 30, (0, 1): 30, (1, 0): 30, (1, 1): 30}),
             )
 
             # ...as well as according to treatment and outcome individually
-            check.equal(Counter(result["train"]["treatment"]), Counter({0: 140, 1: 140}))
+            check.equal(
+                Counter(result["train"]["treatment"]),
+                Counter({0: 140, 1: 140}),
+            )
             check.equal(Counter(result["eval"]["treatment"]), Counter({0: 60, 1: 60}))
 
 
 class TestSplitIntoKFolds:
     @pytest.mark.parametrize("as_lazy", [False, True])
     @pytest.mark.parametrize("k", [3, 5])
-    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize(
+        "stratify_by",
+        [None, "treatment", ["treatment", "outcome"]],
+    )
     @pytest.mark.parametrize("shuffle", [False, True])
     def test_output_types_e_sizes_inputting_df_ubools(
         self,
@@ -241,8 +302,16 @@ class TestSplitIntoKFolds:
                 df_train, df_eval = fold["train"], fold["eval"]
 
             expected_eval_size = int(n_input / k)
-            check.almost_equal(df_train.shape[0], n_input - expected_eval_size, rel=rel_size_deviation_tolerance)
-            check.almost_equal(df_eval.shape[0], expected_eval_size, rel=rel_size_deviation_tolerance)
+            check.almost_equal(
+                df_train.shape[0],
+                n_input - expected_eval_size,
+                rel=rel_size_deviation_tolerance,
+            )
+            check.almost_equal(
+                df_eval.shape[0],
+                expected_eval_size,
+                rel=rel_size_deviation_tolerance,
+            )
 
             # intra-fold non-overlappingness: df_train, df_eval
             if not as_lazy and not shuffle:
@@ -258,7 +327,10 @@ class TestSplitIntoKFolds:
             n_duplicates = df_evals.is_duplicated().sum()
             check.is_true(n_duplicates == 0)
 
-    @pytest.mark.parametrize("stratify_by", [None, "treatment", ["treatment", "outcome"]])
+    @pytest.mark.parametrize(
+        "stratify_by",
+        [None, "treatment", ["treatment", "outcome"]],
+    )
     def test_stratification_inputting_df_ubools(self, df_ubools, stratify_by):
         n_input = 400
         df_input = df_ubools(from_lazy=False, n=n_input, seed=SEED)
@@ -281,26 +353,33 @@ class TestSplitIntoKFolds:
             if stratify_by is None:
                 # results should not (necessarily) be stratified
                 check.not_equal(
-                    Counter(df_eval["treatment"]), Counter({0: 67 - eval_size_modifier, 1: 67 - eval_size_modifier})
+                    Counter(df_eval["treatment"]),
+                    Counter({0: 67 - eval_size_modifier, 1: 67 - eval_size_modifier}),
                 )
 
             elif stratify_by == "treatment":
                 # results should be well stratified according to treatment
                 check.equal(
-                    Counter(df_train["treatment"]), Counter({0: 133 + eval_size_modifier, 1: 133 + eval_size_modifier})
+                    Counter(df_train["treatment"]),
+                    Counter({0: 133 + eval_size_modifier, 1: 133 + eval_size_modifier}),
                 )
                 check.equal(
-                    Counter(df_eval["treatment"]), Counter({0: 67 - eval_size_modifier, 1: 67 - eval_size_modifier})
+                    Counter(df_eval["treatment"]),
+                    Counter({0: 67 - eval_size_modifier, 1: 67 - eval_size_modifier}),
                 )
 
             elif stratify_by == ["treatment", "outcome"]:
                 # results should be well stratified according to treatment & outcome...
                 check.equal(
-                    Counter(zip(df_train["treatment"], df_train["outcome"])),
+                    Counter(
+                        zip(df_train["treatment"], df_train["outcome"], strict=False),
+                    ),
                     Counter({(0, 0): 67, (0, 1): 67, (1, 0): 67, (1, 1): 67}),
                 )
                 check.equal(
-                    Counter(zip(df_eval["treatment"], df_eval["outcome"])),
+                    Counter(
+                        zip(df_eval["treatment"], df_eval["outcome"], strict=False),
+                    ),
                     Counter({(0, 0): 33, (0, 1): 33, (1, 0): 33, (1, 1): 33}),
                 )
 
