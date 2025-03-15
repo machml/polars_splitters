@@ -5,11 +5,28 @@ description = "Polars-based splitter functionalities for polars LazyFrames and D
 authors = [{ name = "Jonas M. Miguel", email = "charter-shushes0n@icloud.com" }]
 readme = "README.md"
 requires-python = ">=3.10, <3.12"
-dependencies = ["loguru>=0.7.2", "polars>=1.24.0, <=2.0.0"]
+dependencies = [
+    "loguru>=0.7.2",
+    "polars>=1.24.0, <=2.0.0",
+]
 
-[project.optional-dependencies]
-test = ["pytest==8.2.2", "pytest-check==2.3.1"]
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "pytest==8.2.2",
+    "pytest-check==2.3.1",
+    "ruff>=0.11.0",
+]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["B", "D3", "E", "F", "I"]
+ignore = ["E501"]  # handled by formatter
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+docstring-code-format = true
