@@ -1,1 +1,1 @@
-from .core import *
+from .core.splitters import *
