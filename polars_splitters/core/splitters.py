@@ -24,7 +24,7 @@ def split_into_train_eval(
     stratify_by: str | list[str] | None = None,
     float_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
-    seed: int | None = 273,
+    seed: int | None = 173,
     as_lazy: bool | None = False,
     as_dict: bool | None = False,
     validate: bool | None = True,
@@ -48,7 +48,7 @@ def split_into_train_eval(
         If no float-typed column in stratify_by, this is ignored.
     shuffle : bool, optional. Defaults to True.
         Whether to shuffle the rows before splitting.
-    seed : int, optional. Defaults to 273.
+    seed : int, optional. Defaults to 173.
         The random seed to use in shuffling.
     as_lazy : bool, optional. Defaults to False.
         Whether to return the train and eval sets as LazyFrames (True) or DataFrames (False).
@@ -137,7 +137,7 @@ def split_into_k_folds(
     stratify_by: str | list[str] | None = None,
     float_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
-    seed: int | None = 273,
+    seed: int | None = 173,
     as_lazy: bool | None = False,
     as_dict: bool | None = False,
     validate: bool | None = True,
@@ -172,7 +172,7 @@ def _split_into_k_train_eval_folds(
     stratify_by: str | list[str] | None = None,
     float_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
-    seed: int | None = 273,
+    seed: int | None = 173,
     as_lazy: bool | None = False,
     as_dict: bool | None = False,
     validate: bool | None = True,
@@ -197,7 +197,7 @@ def _split_into_k_train_eval_folds(
     stratify_by: str | list[str] | None = None,
     float_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
-    seed: int | None = 273,
+    seed: int | None = 173,
     as_lazy: bool | None = False,
     as_dict: bool | None = False,
     validate: bool | None = True,
@@ -220,7 +220,7 @@ def _split_into_k_train_eval_folds(
     stratify_by: str | list[str] | None = None,
     float_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
-    seed: int | None = 273,
+    seed: int | None = 173,
     as_lazy: bool | None = False,
     as_dict: bool | None = False,
     validate: bool | None = True,
@@ -243,7 +243,7 @@ def _split_into_k_train_eval_folds(
     stratify_by: str | list[str] | None = None,
     float_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
-    seed: int | None = 273,
+    seed: int | None = 173,
     as_lazy: bool | None = False,
     as_dict: bool | None = False,
     validate: bool | None = True,
@@ -268,7 +268,7 @@ def _split_into_k_train_eval_folds(
     stratify_by: str | list[str] | None = None,
     float_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
-    seed: int | None = 273,
+    seed: int | None = 173,
     as_lazy: bool | None = False,
     as_dict: bool | None = False,
     validate: bool | None = True,
