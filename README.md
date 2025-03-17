@@ -6,6 +6,7 @@ Polars-based splitter functionalities for polars LazyFrames and DataFrames simil
 
 - split_into_train_eval
 - split_into_k_folds
+- sample: stratified sampling
 
 ## installation
 
@@ -43,5 +44,11 @@ folds = split_into_k_folds(
     stratify_by=["treatment", "outcome"],
     shuffle=False,
     as_lazy=False
+)
+
+df_sample = sample(
+    df,
+    fraction=0.5,
+    stratify_by=["treatment", "outcome"],
 )
 ```
