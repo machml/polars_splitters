@@ -42,6 +42,10 @@ def split_into_train_eval(
     stratify_by : str | list[str], optional. Defaults to None.
         The column names to use for stratification.
         If None (default), stratification is not performed. Note: Stratification by float columns is not currently supported.
+    float_qbins : int | dict[str, int], optional. Defaults to 10 (deciles).
+        How many quantile bins should be used for discretizing float-typed columns in stratify_by, e.g., 10 for discretizing in deciles (default), 5 for quintiles.
+        Can be specified as a constant to be used across all float-typed columns in stratify_by, or as a dictionary in the format {<float_col_name>:<float_qbins>}.
+        If no float-typed column in stratify_by, this is ignored.
     shuffle : bool, optional. Defaults to True.
         Whether to shuffle the rows before splitting.
     seed : int, optional. Defaults to 273.
