@@ -331,7 +331,7 @@ def _split_into_k_train_eval_folds(
     return folds
 
 
-def get_stratified_sample(
+def sample(
     df: DataFrame,
     fraction: float,
     stratify_by: str | list[str],
