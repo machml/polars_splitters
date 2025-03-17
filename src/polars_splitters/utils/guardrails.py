@@ -29,6 +29,9 @@ def _get_eval_sizing_measure(k: int) -> str:
         return "k"
     if k == 1:
         return "eval_rel_size"
+    else:
+        error_message = f"k should be an integer k>=1, got {k} (dtype: {type(k)})"
+        raise ValueError(error_message)
 
 
 def get_lazyframe_size(df: LazyFrame) -> int:
