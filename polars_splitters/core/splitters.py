@@ -15,6 +15,7 @@ df_pl = DataFrame | LazyFrame
 __all__ = [
     "split_into_k_folds",
     "split_into_train_eval",
+    "sample",
 ]
 
 
