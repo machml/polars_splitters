@@ -334,6 +334,29 @@ def get_stratified_sample(
     float_qbins: int | dict[str, int] = 10,
     seed: int = 173,
 ) -> DataFrame:
+    """
+    Get a stratified sample from a polars DataFrame.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Data to be sampled.
+    fraction : float
+        A number from 0.0 to 1.0 specifying the size of the sample relative to the original dataframe.
+    stratify_by : str | list[str]
+        Column(s) to use for stratification.
+    float_qbins : int | dict[str, int], optional. Defaults to 10 (deciles).
+        How many quantile bins should be used for discretizing float-typed columns in stratify_by, e.g., 10 for discretizing in deciles (default), 5 for quintiles.
+        Can be specified as a constant to be used across all float-typed columns in stratify_by, or as a dictionary in the format {<float_col_name>:<float_qbins>}.
+        If no float-typed column in stratify_by, this is ignored.
+    seed : int, optional. Defaults to 173.
+        The random seed to use in shuffling.
+
+    Returns
+    -------
+    DataFrame
+        Stratified sample.
+    """
     _, df_sample = split_into_train_eval(
         df,
         eval_rel_size=fraction,
