@@ -28,7 +28,8 @@ def split_into_k_folds(
     df: LazyFrame | DataFrame,
     k: int | None = 1,
     stratify_by: str | list[str] | None = None,
-    float_qbins: int | dict[str, int] = 10,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
     seed: int | None = 173,
     as_lazy: bool | None = False,
@@ -47,7 +48,8 @@ def split_into_k_folds(
         eval_rel_size=None,
         k=k,
         stratify_by=stratify_by,
-        float_qbins=float_qbins,
+        max_numeric_cardinality=max_numeric_cardinality,
+        numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
         shuffle=shuffle,
         seed=seed,
         as_lazy=as_lazy,
@@ -63,7 +65,8 @@ def _split_into_k_train_eval_folds(
     eval_rel_size: Literal[None] = ...,
     k: int | None = 1,
     stratify_by: str | list[str] | None = None,
-    float_qbins: int | dict[str, int] = 10,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
     seed: int | None = 173,
     as_lazy: bool | None = False,
@@ -88,7 +91,8 @@ def _split_into_k_train_eval_folds(
     eval_rel_size: float | None = None,
     k: int | None = 1,
     stratify_by: str | list[str] | None = None,
-    float_qbins: int | dict[str, int] = 10,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
     seed: int | None = 173,
     as_lazy: bool | None = False,
@@ -111,7 +115,8 @@ def _split_into_k_train_eval_folds(
     eval_rel_size: float | None = None,
     k: int | None = 1,
     stratify_by: str | list[str] | None = None,
-    float_qbins: int | dict[str, int] = 10,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
     seed: int | None = 173,
     as_lazy: bool | None = False,
@@ -134,7 +139,8 @@ def _split_into_k_train_eval_folds(
     eval_rel_size: float | None = None,
     k: int | None = 1,
     stratify_by: str | list[str] | None = None,
-    float_qbins: int | dict[str, int] = 10,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
     seed: int | None = 173,
     as_lazy: bool | None = False,
@@ -159,7 +165,8 @@ def _split_into_k_train_eval_folds(
     eval_rel_size: float | None = None,
     k: int = 1,
     stratify_by: str | list[str] | None = None,
-    float_qbins: int | dict[str, int] = 10,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
     seed: int | None = 173,
     as_lazy: bool | None = False,
@@ -186,32 +193,45 @@ def _split_into_k_train_eval_folds(
 
     df_preprocessed = df.clone()
     if stratify_by:
-        float_strat_cols = df.select(cs.float() & cs.by_name(stratify_by)).columns
-
-        if float_strat_cols:
-            logger.info(
-                f"Float columns found among stratify_by columns: {float_strat_cols}. Discretizing these columns into {float_qbins} quantile bins",
-            )
-            if isinstance(float_qbins, int):
-                float_qbins = dict.fromkeys(float_strat_cols, float_qbins)
-
-            df_preprocessed = df.with_columns(
-                [
-                    col(col_name).qcut(float_qbins[col_name]).alias(f"polars_splitters:{col_name}:qcut")
-                    for col_name in float_strat_cols
-                ],
-            )
-
-            stratify_by = [
-                f"polars_splitters:{col_name}:qcut" if col_name in float_strat_cols else col_name
-                for col_name in stratify_by
+        strat_nums = df.select(cs.numeric() & cs.by_name(stratify_by)).columns
+        if len(strat_nums) > 0:
+            if max_numeric_cardinality is None:
+                max_numeric_cardinality = int(1e6)
+            df_ = df.collect() if isinstance(df, LazyFrame) else df.clone()
+            high_cardinality_num_strat_cols = [
+                col_name for col_name in strat_nums if df_[col_name].n_unique() > max_numeric_cardinality
             ]
-            logger.debug(f"stratify_by: {stratify_by}")
+            df_.clear()
+
+            if len(high_cardinality_num_strat_cols) > 0:
+                logger.info(
+                    f"""Numeric columns with high cardinality (>{max_numeric_cardinality} uniques) found among stratify_by columns: {high_cardinality_num_strat_cols}.
+                    Its quantilized version ({numeric_high_cardinal_qbins} quantile bins) will be use for stratification instead."""
+                )
+                if isinstance(numeric_high_cardinal_qbins, int):
+                    numeric_high_cardinal_qbins = dict.fromkeys(
+                        high_cardinality_num_strat_cols, numeric_high_cardinal_qbins
+                    )
+
+                df_preprocessed = df.with_columns(
+                    [
+                        col(col_name)
+                        .qcut(numeric_high_cardinal_qbins[col_name])
+                        .alias(f"polars_splitters:{col_name}:qcut")
+                        for col_name in high_cardinality_num_strat_cols
+                    ],
+                )
+
+                stratify_by = [
+                    f"polars_splitters:{col_name}:qcut" if col_name in high_cardinality_num_strat_cols else col_name
+                    for col_name in stratify_by
+                ]
+                logger.debug(f"stratify_by: {stratify_by}")
 
         idxs = idxs.over(stratify_by)
         eval_size = eval_size.over(stratify_by)
 
-    folds = [{"train": None, "eval": None} for i in range(k)]
+    folds: list[dict[str, DataFrame]] = [{"train": DataFrame(), "eval": DataFrame()} for _ in range(k)]
     for i in range(k):
         is_eval = i * eval_size <= idxs
         is_eval = is_eval & (idxs < (i + 1) * eval_size)
@@ -228,7 +248,8 @@ def split_into_train_eval(
     df: LazyFrame | DataFrame,
     eval_rel_size: float,
     stratify_by: str | list[str] | None = None,
-    float_qbins: int | dict[str, int] = 10,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     shuffle: bool | None = True,
     seed: int | None = 173,
     as_lazy: bool | None = False,
@@ -327,7 +348,8 @@ def split_into_train_eval(
         eval_rel_size=eval_rel_size,
         k=1,
         stratify_by=stratify_by,
-        float_qbins=float_qbins,
+        max_numeric_cardinality=max_numeric_cardinality,
+        numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
         shuffle=shuffle,
         seed=seed,
         as_lazy=as_lazy,
@@ -341,7 +363,8 @@ def sample(
     df: DataFrame,
     fraction: float,
     stratify_by: str | list[str],
-    float_qbins: int | dict[str, int] = 10,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     fraction_rel_tolerance: float | None = 0.1,
     seed: int = 173,
 ) -> DataFrame:
@@ -387,7 +410,8 @@ def sample(
         eval_rel_size=fraction,
         k=1,
         stratify_by=stratify_by,
-        float_qbins=float_qbins,
+        max_numeric_cardinality=max_numeric_cardinality,
+        numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
         shuffle=True,
         seed=seed,
         as_lazy=False,
