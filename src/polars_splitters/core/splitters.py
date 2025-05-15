@@ -18,6 +18,11 @@ __all__ = [
     "sample",
 ]
 
+TrainEvalTuple = tuple[DataFrame, DataFrame]
+TrainEvalDict = dict[str, DataFrame]
+LazyTrainEvalTuple = tuple[LazyFrame, LazyFrame]
+LazyTrainEvalDict = dict[str, LazyFrame]
+
 
 def split_into_k_folds(
     df: LazyFrame | DataFrame,
@@ -31,10 +36,10 @@ def split_into_k_folds(
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    list[tuple[LazyFrame, LazyFrame]]
-    | list[tuple[DataFrame, DataFrame]]
-    | list[dict[str, LazyFrame]]
-    | list[dict[str, DataFrame]]
+    list[LazyTrainEvalTuple]
+    | list[TrainEvalTuple]
+    | list[LazyTrainEvalDict]
+    | list[TrainEvalDict]
 ):
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
     return _split_into_k_train_eval_folds(
@@ -66,14 +71,14 @@ def _split_into_k_train_eval_folds(
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    tuple[LazyFrame, LazyFrame]
-    | tuple[DataFrame, DataFrame]
-    | dict[str, LazyFrame]
-    | dict[str, DataFrame]
-    | list[tuple[LazyFrame, LazyFrame]]
-    | list[tuple[DataFrame, DataFrame]]
-    | list[dict[str, LazyFrame]]
-    | list[dict[str, DataFrame]]
+    LazyTrainEvalTuple
+    | TrainEvalTuple
+    | LazyTrainEvalDict
+    | TrainEvalDict
+    | list[LazyTrainEvalTuple]
+    | list[TrainEvalTuple]
+    | list[LazyTrainEvalDict]
+    | list[TrainEvalDict]
 ): ...
 
 
@@ -91,12 +96,12 @@ def _split_into_k_train_eval_folds(
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    tuple[LazyFrame, LazyFrame]
-    | tuple[DataFrame, DataFrame]
-    | list[tuple[LazyFrame, LazyFrame]]
-    | list[tuple[DataFrame, DataFrame]]
-    | list[dict[str, LazyFrame]]
-    | list[dict[str, DataFrame]]
+    LazyTrainEvalTuple
+    | TrainEvalTuple
+    | list[LazyTrainEvalTuple]
+    | list[TrainEvalTuple]
+    | list[LazyTrainEvalDict]
+    | list[TrainEvalDict]
 ): ...
 
 
@@ -114,12 +119,12 @@ def _split_into_k_train_eval_folds(
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    tuple[LazyFrame, LazyFrame]
-    | tuple[DataFrame, DataFrame]
-    | list[tuple[LazyFrame, LazyFrame]]
-    | list[tuple[DataFrame, DataFrame]]
-    | list[dict[str, LazyFrame]]
-    | list[dict[str, DataFrame]]
+    LazyTrainEvalTuple
+    | TrainEvalTuple
+    | list[LazyTrainEvalTuple]
+    | list[TrainEvalTuple]
+    | list[LazyTrainEvalDict]
+    | list[TrainEvalDict]
 ): ...
 
 
@@ -137,12 +142,12 @@ def _split_into_k_train_eval_folds(
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    tuple[LazyFrame, LazyFrame]
-    | tuple[DataFrame, DataFrame]
-    | list[tuple[LazyFrame, LazyFrame]]
-    | list[tuple[DataFrame, DataFrame]]
-    | list[dict[str, LazyFrame]]
-    | list[dict[str, DataFrame]]
+    LazyTrainEvalTuple
+    | TrainEvalTuple
+    | list[LazyTrainEvalTuple]
+    | list[TrainEvalTuple]
+    | list[LazyTrainEvalDict]
+    | list[TrainEvalDict]
 ): ...
 
 
@@ -162,12 +167,12 @@ def _split_into_k_train_eval_folds(
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> (
-    tuple[LazyFrame, LazyFrame]
-    | tuple[DataFrame, DataFrame]
-    | list[tuple[LazyFrame, LazyFrame]]
-    | list[tuple[DataFrame, DataFrame]]
-    | list[dict[str, LazyFrame]]
-    | list[dict[str, DataFrame]]
+    LazyTrainEvalTuple
+    | TrainEvalTuple
+    | list[LazyTrainEvalTuple]
+    | list[TrainEvalTuple]
+    | list[LazyTrainEvalDict]
+    | list[TrainEvalDict]
 ):
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
     idxs = int_range(0, pl_len())
@@ -230,7 +235,7 @@ def split_into_train_eval(
     as_dict: bool | None = False,
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
-) -> tuple[LazyFrame, LazyFrame] | tuple[DataFrame, DataFrame] | dict[str, LazyFrame] | dict[str, DataFrame]:
+) -> LazyTrainEvalTuple | TrainEvalTuple | LazyTrainEvalDict | TrainEvalDict:
     r"""Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
     It includes logging and some guardrails: type coercion as well as validation for the inputs and outputs.
 
@@ -264,7 +269,7 @@ def split_into_train_eval(
 
     Returns
     -------
-    tuple[LazyFrame, LazyFrame] | tuple[DataFrame, DataFrame] | dict[str, LazyFrame] | dict[str, DataFrame]
+    LazyTrainEvalTuple | TrainEvalTuple | LazyTrainEvalDict | TrainEvalDict
         df_train and df_eval, either as a tuple or as a dictionary, and either as LazyFrames or DataFrames, depending on the values of as_dict and as_lazy.
 
     Raises
