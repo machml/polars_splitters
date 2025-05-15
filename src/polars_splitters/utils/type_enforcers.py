@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 
 from loguru import logger
 from polars import DataFrame, LazyFrame
@@ -22,7 +22,7 @@ def ensure_type(var: Any, to_type: type, warn: bool = False) -> Any:
         return var.lazy()
     if (from_type, to_type) == (dict, tuple):
         return tuple(var.values())
-    if to_type == list:
+    if to_type is list:
         return [var]
     raise NotImplementedError(f"Cannot enforce a {from_type} into a {to_type}.")
 
