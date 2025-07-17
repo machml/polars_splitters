@@ -1,14 +1,9 @@
-from typing import Literal, overload
-
 from loguru import logger
 from polars import DataFrame, Int64, LazyFrame, col, int_range
 from polars import len as pl_len
 from polars import selectors as cs
 
-from polars_splitters.utils.guardrails import (
-    enforce_input_outputs_expected_types,
-    validate_splitting,
-)
+from polars_splitters.utils.guardrails import enforce_input_outputs_expected_types, validate_splitting
 
 df_pl = DataFrame | LazyFrame
 
@@ -36,12 +31,7 @@ def split_into_k_folds(
     as_dict: bool | None = False,
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
-) -> (
-    list[LazyTrainEvalTuple]
-    | list[TrainEvalTuple]
-    | list[LazyTrainEvalDict]
-    | list[TrainEvalDict]
-):
+) -> list[LazyTrainEvalTuple] | list[TrainEvalTuple] | list[LazyTrainEvalDict] | list[TrainEvalDict]:
     """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
     return _split_into_k_train_eval_folds(
         df=df,
@@ -59,129 +49,24 @@ def split_into_k_folds(
     )
 
 
-@overload
-def _split_into_k_train_eval_folds(
-    df: LazyFrame | DataFrame,
-    eval_rel_size: Literal[None] = ...,
-    k: int | None = 1,
-    stratify_by: str | list[str] | None = None,
-    max_numeric_cardinality: int | None = 20,
-    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
-    shuffle: bool | None = True,
-    seed: int | None = 173,
-    as_lazy: bool | None = False,
-    as_dict: bool | None = False,
-    validate: bool | None = True,
-    rel_size_deviation_tolerance: float | None = 0.1,
-) -> (
-    LazyTrainEvalTuple
-    | TrainEvalTuple
-    | LazyTrainEvalDict
-    | TrainEvalDict
-    | list[LazyTrainEvalTuple]
-    | list[TrainEvalTuple]
-    | list[LazyTrainEvalDict]
-    | list[TrainEvalDict]
-): ...
-
-
-@overload
-def _split_into_k_train_eval_folds(
-    df: LazyFrame | DataFrame,
-    eval_rel_size: float | None = None,
-    k: int | None = 1,
-    stratify_by: str | list[str] | None = None,
-    max_numeric_cardinality: int | None = 20,
-    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
-    shuffle: bool | None = True,
-    seed: int | None = 173,
-    as_lazy: bool | None = False,
-    as_dict: bool | None = False,
-    validate: bool | None = True,
-    rel_size_deviation_tolerance: float | None = 0.1,
-) -> (
-    LazyTrainEvalTuple
-    | TrainEvalTuple
-    | list[LazyTrainEvalTuple]
-    | list[TrainEvalTuple]
-    | list[LazyTrainEvalDict]
-    | list[TrainEvalDict]
-): ...
-
-
-@overload
-def _split_into_k_train_eval_folds(
-    df: LazyFrame | DataFrame,
-    eval_rel_size: float | None = None,
-    k: int | None = 1,
-    stratify_by: str | list[str] | None = None,
-    max_numeric_cardinality: int | None = 20,
-    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
-    shuffle: bool | None = True,
-    seed: int | None = 173,
-    as_lazy: bool | None = False,
-    as_dict: bool | None = False,
-    validate: bool | None = True,
-    rel_size_deviation_tolerance: float | None = 0.1,
-) -> (
-    LazyTrainEvalTuple
-    | TrainEvalTuple
-    | list[LazyTrainEvalTuple]
-    | list[TrainEvalTuple]
-    | list[LazyTrainEvalDict]
-    | list[TrainEvalDict]
-): ...
-
-
-@overload
-def _split_into_k_train_eval_folds(
-    df: LazyFrame | DataFrame,
-    eval_rel_size: float | None = None,
-    k: int | None = 1,
-    stratify_by: str | list[str] | None = None,
-    max_numeric_cardinality: int | None = 20,
-    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
-    shuffle: bool | None = True,
-    seed: int | None = 173,
-    as_lazy: bool | None = False,
-    as_dict: bool | None = False,
-    validate: bool | None = True,
-    rel_size_deviation_tolerance: float | None = 0.1,
-) -> (
-    LazyTrainEvalTuple
-    | TrainEvalTuple
-    | list[LazyTrainEvalTuple]
-    | list[TrainEvalTuple]
-    | list[LazyTrainEvalDict]
-    | list[TrainEvalDict]
-): ...
-
-
 @logger.catch
 @enforce_input_outputs_expected_types
 @validate_splitting
 def _split_into_k_train_eval_folds(
     df: LazyFrame | DataFrame,
-    eval_rel_size: float | None = None,
     k: int = 1,
     stratify_by: str | list[str] | None = None,
-    max_numeric_cardinality: int | None = 20,
+    max_numeric_cardinality: int = 20,
     numeric_high_cardinal_qbins: int | dict[str, int] = 10,
-    shuffle: bool | None = True,
-    seed: int | None = 173,
-    as_lazy: bool | None = False,
-    as_dict: bool | None = False,
-    validate: bool | None = True,
-    rel_size_deviation_tolerance: float | None = 0.1,
-) -> (
-    LazyTrainEvalTuple
-    | TrainEvalTuple
-    | list[LazyTrainEvalTuple]
-    | list[TrainEvalTuple]
-    | list[LazyTrainEvalDict]
-    | list[TrainEvalDict]
-):
-    """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
+    shuffle: bool = True,
+    seed: int = 173,
+    validate: bool = True,
+    rel_size_deviation_tolerance: float = 0.1,
+) -> list[TrainEvalDict]:
+    """
+    Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns.
+    Always returns a list of dicts with keys 'train' and 'eval', each containing a DataFrame.
+    """
     idxs = int_range(0, pl_len())
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
@@ -231,15 +116,18 @@ def _split_into_k_train_eval_folds(
         idxs = idxs.over(stratify_by)
         eval_size = eval_size.over(stratify_by)
 
-    folds: list[dict[str, DataFrame]] = [{"train": DataFrame(), "eval": DataFrame()} for _ in range(k)]
+    folds: list[TrainEvalDict] = []
     for i in range(k):
         is_eval = i * eval_size <= idxs
         is_eval = is_eval & (idxs < (i + 1) * eval_size)
 
-        folds[i] = {
-            "train": df_preprocessed.filter(~is_eval).select(df.columns),
-            "eval": df_preprocessed.filter(is_eval).select(df.columns),
-        }
+        df_train = df_preprocessed.filter(~is_eval).select(df.columns)
+        df_eval = df_preprocessed.filter(is_eval).select(df.columns)
+
+        df_train = df_train.collect() if isinstance(df_train, LazyFrame) else df_train
+        df_eval = df_eval.collect() if isinstance(df_eval, LazyFrame) else df_eval
+
+        folds.append({"train": df_train, "eval": df_eval})
 
     return folds
 
@@ -249,63 +137,54 @@ def split_into_train_eval(
     eval_rel_size: float,
     stratify_by: str | list[str] | None = None,
     max_numeric_cardinality: int | None = 20,
-    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 5,
     shuffle: bool | None = True,
     seed: int | None = 173,
-    as_lazy: bool | None = False,
-    as_dict: bool | None = False,
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
-) -> LazyTrainEvalTuple | TrainEvalTuple | LazyTrainEvalDict | TrainEvalDict:
-    r"""Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
-    It includes logging and some guardrails: type coercion as well as validation for the inputs and outputs.
+) -> TrainEvalTuple:
+    r"""
+    Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
+    Includes logging and guardrails: type coercion and validation for inputs and outputs.
 
     Parameters
     ----------
     df : LazyFrame | DataFrame
         The polars DataFrame to split.
     eval_rel_size : float
-        The targeted relative size of the eval set. Must be between 0.0 and 1.0.
-    stratify_by : str | list[str], optional. Defaults to None.
-        The column names to use for stratification.
-        If None (default), stratification is not performed. Note: Stratification by float columns is not currently supported.
-    float_qbins : int | dict[str, int], optional. Defaults to 10 (deciles).
-        How many quantile bins should be used for discretizing float-typed columns in stratify_by, e.g., 10 for discretizing in deciles (default), 5 for quintiles.
-        Can be specified as a constant to be used across all float-typed columns in stratify_by, or as a dictionary in the format {<float_col_name>:<float_qbins>}.
-        If no float-typed column in stratify_by, this is ignored.
-    shuffle : bool, optional. Defaults to True.
-        Whether to shuffle the rows before splitting.
-    seed : int, optional. Defaults to 173.
-        The random seed to use in shuffling.
-    as_lazy : bool, optional. Defaults to False.
-        Whether to return the train and eval sets as LazyFrames (True) or DataFrames (False).
-    as_dict : bool, optional. Defaults to False.
-        Whether to return the train and eval sets as a tuple (False) or as a dictionary (True).
-    validate : bool, optional. Defaults to True.
-        Whether to validate the inputs and outputs.
-    rel_size_deviation_tolerance : float, optional. Defaults to 0.1.
-        Sets the maximum allowed abs(eval_rel_size_actual - eval_rel_size).
-        When stratifying, the eval_rel_size_actual might deviate from eval_rel_size due to the fact that strata for the given data may not be perfectly divisible at the desired proportion (1-eval_rel_size, eval_rel_size).
-        If validate is set to False, this parameter is ignored.
+        Targeted relative size of the eval set. Must be between 0.0 and 1.0.
+    stratify_by : str | list[str], optional
+        Column name(s) to use for stratification. If None, stratification is not performed. Stratification by float columns is not supported.
+    max_numeric_cardinality : int, optional
+        Maximum unique values allowed in numeric columns for direct stratification. Columns exceeding this will be quantile-binned. Defaults to 20.
+    numeric_high_cardinal_qbins : int | dict[str, int], optional
+        Number of quantile bins for high-cardinality numeric columns in stratify_by. Can be an int (applies to all) or dict mapping column names to bin counts. Defaults to 5.
+    shuffle : bool, optional
+        Whether to shuffle rows before splitting. Defaults to True.
+    seed : int, optional
+        Random seed for shuffling. Defaults to 173.
+    validate : bool, optional
+        Whether to validate inputs and outputs. Defaults to True.
+    rel_size_deviation_tolerance : float, optional
+        Maximum allowed absolute deviation between actual and requested eval set size. Defaults to 0.1.
 
     Returns
     -------
-    LazyTrainEvalTuple | TrainEvalTuple | LazyTrainEvalDict | TrainEvalDict
-        df_train and df_eval, either as a tuple or as a dictionary, and either as LazyFrames or DataFrames, depending on the values of as_dict and as_lazy.
+    tuple[DataFrame, DataFrame]
+        Train and eval sets as DataFrames.
 
     Raises
     ------
     NotImplementedError
-        When trying to stratify by a float column.
+        If stratifying by a float column.
     ValueError
-        When the actual relative size of the eval set deviates from the requested relative size by more than the specified tolerance.
-        Or when the size of the smallest set is smaller than the number of strata (unique row-wise combinations of values in the stratify_by columns).
+        If the actual eval set size deviates from the requested size by more than the specified tolerance, or if the smallest set is smaller than the number of strata.
 
     Examples
     --------
     >>> import polars as pl
     >>> from polars_splitters.core.splitters import split_into_train_eval
-    >>> df = DataFrame(
+    >>> df = pl.DataFrame(
     ...     {
     ...         "feature_1": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
     ...         "treatment": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
@@ -313,7 +192,7 @@ def split_into_train_eval(
     ...     }
     ... )
     >>> df_train, df_eval = split_into_train_eval(
-    ...     df, eval_rel_size=0.3, stratify_by=["treatment", "outcome"], shuffle=True, as_lazy=False
+    ...     df, eval_rel_size=0.3, stratify_by=["treatment", "outcome"], shuffle=True
     ... )
     >>> print(df_train, df_eval, sep="\n\n")
     shape: (7, 3)
@@ -341,9 +220,8 @@ def split_into_train_eval(
     │ 6.0       ┆ 1         ┆ 0       │
     │ 10.0      ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
-
     """
-    return _split_into_k_train_eval_folds(
+    df_train, df_eval = _split_into_k_train_eval_folds(
         df=df,
         eval_rel_size=eval_rel_size,
         k=1,
@@ -352,11 +230,14 @@ def split_into_train_eval(
         numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
         shuffle=shuffle,
         seed=seed,
-        as_lazy=as_lazy,
-        as_dict=as_dict,
+        as_lazy=False,
+        as_dict=False,
         validate=validate,
         rel_size_deviation_tolerance=rel_size_deviation_tolerance,
     )
+
+    assert isinstance(df_train, DataFrame) and isinstance(df_eval, DataFrame)
+    return df_train, df_eval
 
 
 def sample(
@@ -364,7 +245,7 @@ def sample(
     fraction: float,
     stratify_by: str | list[str],
     max_numeric_cardinality: int | None = 20,
-    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 5,
     fraction_rel_tolerance: float | None = 0.1,
     seed: int = 173,
 ) -> DataFrame:
@@ -379,8 +260,8 @@ def sample(
         A number from 0.0 to 1.0 specifying the size of the sample relative to the original dataframe.
     stratify_by : str | list[str]
         Column(s) to use for stratification.
-    float_qbins : int | dict[str, int], optional. Defaults to 10 (deciles).
-        How many quantile bins should be used for discretizing float-typed columns in stratify_by, e.g., 10 for discretizing in deciles (default), 5 for quintiles.
+    float_qbins : int | dict[str, int], optional. Defaults to 5 (quintiles).
+        How many quantile bins should be used for discretizing float-typed columns in stratify_by, e.g., 10 for discretizing in deciles, 5 for quintiles.
         Can be specified as a constant to be used across all float-typed columns in stratify_by, or as a dictionary in the format {<float_col_name>:<float_qbins>}.
         If no float-typed column in stratify_by, this is ignored.
     fraction_rel_tolerance : float, optional. Defaults to 0.1.
@@ -395,29 +276,14 @@ def sample(
     DataFrame
         Stratified sample.
     """
-    # _, df_sample = split_into_train_eval(
-    #     df,
-    #     eval_rel_size=fraction,
-    #     stratify_by=stratify_by,
-    #     float_qbins=float_qbins,
-    #     shuffle=True,
-    #     as_lazy=False,
-    #     seed=seed,
-    # )
-    # return df_sample
-    _, df_sample = _split_into_k_train_eval_folds(
-        df=df,
+    _, df_sample = split_into_train_eval(
+        df,
         eval_rel_size=fraction,
-        k=1,
         stratify_by=stratify_by,
         max_numeric_cardinality=max_numeric_cardinality,
+        rel_size_deviation_tolerance=fraction_rel_tolerance,
         numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
         shuffle=True,
         seed=seed,
-        as_lazy=False,
-        as_dict=False,
-        validate=True,
-        rel_size_deviation_tolerance=fraction_rel_tolerance,
     )
-
     return df_sample
