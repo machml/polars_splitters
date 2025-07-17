@@ -1,4 +1,4 @@
-.PHONY: lint format
+.PHONY: lint format build publish
 
 lint:
 	ruff check --fix .
