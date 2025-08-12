@@ -4,8 +4,7 @@ import pytest
 from polars import DataFrame, concat
 from pytest_check import check
 
-from polars_splitters.core.splitters import (split_into_k_folds,
-                                             split_into_train_eval)
+from polars_splitters.core.splitters import split_into_k_folds, split_into_train_eval
 
 SEED = 173
 
