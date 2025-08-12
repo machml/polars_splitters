@@ -30,12 +30,9 @@ df = pl.DataFrame(
 
 df_train, df_test = split_into_train_eval(
     df,
-    eval_rel_size=0.3,
+    eval_rel_size=0.4,
     stratify_by=["treatment", "outcome"],
-    shuffle=True,
-    validate=True,
-    as_lazy=False,
-    rel_size_deviation_tolerance=0.1,
+    shuffle=False,
 )
 
 folds = split_into_k_folds(
@@ -52,3 +49,15 @@ df_sample = sample(
     stratify_by=["treatment", "outcome"],
 )
 ```
+
+## current limitations
+
+- only supports polars eager API (pl.DataFrame): no pl.LazyFrame
+
+## future work
+
+- test: use uv & github actions for testing on multiple python versions, bounding polars versions
+
+- [test] add unit tests for sample()
+- [test] add tests for handling ties
+- [feat] implement handling of ties
