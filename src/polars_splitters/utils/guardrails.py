@@ -1,11 +1,13 @@
 from collections.abc import Callable
 from functools import wraps
+from inspect import signature
 
 from loguru import logger
-from polars import Int64, LazyFrame
+from polars import DataFrame, Int64, LazyFrame
 from polars import len as pl_len
 
-from polars_splitters.utils.wrapping_helpers import get_arg_value, replace_arg_value
+from polars_splitters.utils.wrapping_helpers import (get_arg_value,
+                                                     replace_arg_value)
 
 
 def _get_suggestion_for_loosening_stratification(k: int) -> str:
@@ -34,8 +36,11 @@ def _get_eval_sizing_measure(k: int) -> str:
         raise ValueError(error_message)
 
 
-def get_lazyframe_size(df: LazyFrame) -> int:
-    return df.select(pl_len()).collect().item()
+def get_frame_size(df: LazyFrame | DataFrame) -> int:
+    if isinstance(df, LazyFrame):
+        return df.select(pl_len()).collect().item()
+    else:
+        return df.height
 
 
 def validate_var_within_bounds(
@@ -68,8 +73,10 @@ def validate_splitting(func: Callable) -> Callable:
             expected_type=bool,
         )
         if validate:
-            # load arguments: args[0] stores theo func, the actual args start at index 1
+            # load arguments: args[0] stores the func, the actual args start at index 1
             df = get_arg_value(args, kwargs, "df", arg_index=0, expected_type=LazyFrame)
+            assert isinstance(df, DataFrame), "df must be a pl.DataFrame]"
+
             eval_rel_size = get_arg_value(
                 args,
                 kwargs,
@@ -111,7 +118,7 @@ def validate_splitting(func: Callable) -> Callable:
 
                 eval_rel_size_ = eval_rel_size
 
-            input_size = get_lazyframe_size(df)
+            input_size = get_frame_size(df)
 
             if stratify_by:
                 # validate stratification feasibility (size_input, eval_rel_size (or k), n_strata, stratify_by)
@@ -143,7 +150,11 @@ def validate_splitting(func: Callable) -> Callable:
                     {_get_suggestion_for_loosening_stratification(k)}
                     """
 
-        folds = func(*args, **kwargs)
+        # Get the parameter names of the wrapped function
+        func_param_names = set(signature(func).parameters.keys())
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in func_param_names}
+
+        folds = func(*args, **filtered_kwargs)
 
         if validate:
             rel_size_deviation_tolerance = get_arg_value(
@@ -186,13 +197,15 @@ def enforce_input_outputs_expected_types(func: Callable) -> Callable:
 
     @wraps(func)
     def wrapper(*args, **kwargs) -> Exception | None:
-        df = get_arg_value(args, kwargs, "df", arg_index=0, expected_type=LazyFrame)
+        df = get_arg_value(args, kwargs, "df", arg_index=0, expected_type=DataFrame)
+
+        assert isinstance(df, DataFrame), "df must be a pl.DataFrame"
         args, kwargs = replace_arg_value(
             args,
             kwargs,
             "df",
             arg_index=0,
-            new_value=df.lazy(),
+            new_value=df,
         )
 
         k = get_arg_value(args, kwargs, "k", arg_index=2, expected_type=int)

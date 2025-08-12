@@ -3,8 +3,7 @@ from polars import DataFrame, Int64, LazyFrame, col, int_range
 from polars import len as pl_len
 from polars import selectors as cs
 
-from polars_splitters.utils.guardrails import (
-    enforce_input_outputs_expected_types, validate_splitting)
+from polars_splitters.utils.guardrails import validate_splitting
 
 df_pl = DataFrame | LazyFrame
 
@@ -20,11 +19,9 @@ LazyTrainEvalTuple = tuple[LazyFrame, LazyFrame]
 LazyTrainEvalDict = dict[str, LazyFrame]
 
 
-@logger.catch
-@enforce_input_outputs_expected_types
-@validate_splitting
 def _split_into_k_train_eval_folds(
-    df: LazyFrame | DataFrame,
+    df: DataFrame,
+    eval_rel_size: float | None = None,
     k: int = 1,
     stratify_by: str | list[str] | None = None,
     max_numeric_cardinality: int = 20,
@@ -38,12 +35,18 @@ def _split_into_k_train_eval_folds(
     Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns.
     Always returns a list of dicts with keys 'train' and 'eval', each containing a DataFrame.
     """
+    if isinstance(stratify_by, str):
+        stratify_by = [stratify_by]
+
     idxs = int_range(0, pl_len())
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
 
+    assert (eval_rel_size is None) or (k == 1), "eval_rel_size must be either explicitly specified or implicitly via k, not both."
     if k > 1:  # k-fold
         eval_rel_size = 1 / k
+
+    assert eval_rel_size is not None, "either k or eval_rel_size must be specified."
 
     eval_size = (eval_rel_size * pl_len()).round(0).clip(lower_bound=1).cast(Int64)
 
@@ -53,7 +56,7 @@ def _split_into_k_train_eval_folds(
         if len(strat_nums) > 0:
             if max_numeric_cardinality is None:
                 max_numeric_cardinality = int(1e6)
-            df_ = df.collect() if isinstance(df, LazyFrame) else df.clone()
+            df_ = df.clone()
             high_cardinality_num_strat_cols = [
                 col_name for col_name in strat_nums if df_[col_name].n_unique() > max_numeric_cardinality
             ]
@@ -95,46 +98,42 @@ def _split_into_k_train_eval_folds(
         df_train = df_preprocessed.filter(~is_eval).select(df.columns)
         df_eval = df_preprocessed.filter(is_eval).select(df.columns)
 
-        df_train = df_train.collect() if isinstance(df_train, LazyFrame) else df_train
-        df_eval = df_eval.collect() if isinstance(df_eval, LazyFrame) else df_eval
-
         folds.append({"train": df_train, "eval": df_eval})
+
+    if validate:
+        validate_splitting(folds=folds, df=df, k=k, stratify_by=stratify_by, eval_rel_size=eval_rel_size, rel_size_deviation_tolerance=rel_size_deviation_tolerance)
 
     return folds
 
 
 def split_into_k_folds(
-    df: LazyFrame | DataFrame,
+    df: DataFrame,
     k: int | None = 1,
     stratify_by: str | list[str] | None = None,
     max_numeric_cardinality: int | None = 20,
     numeric_high_cardinal_qbins: int | dict[str, int] = 5,
     shuffle: bool | None = True,
     seed: int | None = 173,
-    as_lazy: bool | None = False,
-    as_dict: bool | None = False,
     validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> list[LazyTrainEvalTuple] | list[TrainEvalTuple] | list[LazyTrainEvalDict] | list[TrainEvalDict]:
-    """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
+    """Split a DataFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
     return _split_into_k_train_eval_folds(
         df=df,
         eval_rel_size=None,
-        k=k,
+        k=k if k is not None else 1,
         stratify_by=stratify_by,
-        max_numeric_cardinality=max_numeric_cardinality,
+        max_numeric_cardinality=max_numeric_cardinality if max_numeric_cardinality is not None else 20,
         numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
-        shuffle=shuffle,
-        seed=seed,
-        as_lazy=as_lazy,
-        as_dict=as_dict,
-        validate=validate,
-        rel_size_deviation_tolerance=rel_size_deviation_tolerance,
+        shuffle=shuffle if shuffle is not None else True,
+        seed=seed if seed is not None else 173,
+        validate=validate if validate is not None else True,
+        rel_size_deviation_tolerance=rel_size_deviation_tolerance if rel_size_deviation_tolerance is not None else 0.1,
     )
 
 
 def split_into_train_eval(
-    df: LazyFrame | DataFrame,
+    df: DataFrame,
     eval_rel_size: float,
     stratify_by: str | list[str] | None = None,
     max_numeric_cardinality: int | None = 20,
@@ -150,7 +149,7 @@ def split_into_train_eval(
 
     Parameters
     ----------
-    df : LazyFrame | DataFrame
+    df : DataFrame
         The polars DataFrame to split.
     eval_rel_size : float
         Targeted relative size of the eval set. Must be between 0.0 and 1.0.
@@ -222,22 +221,22 @@ def split_into_train_eval(
     │ 10.0      ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
     """
-    df_train, df_eval = _split_into_k_train_eval_folds(
+    folds = _split_into_k_train_eval_folds(
         df=df,
         eval_rel_size=eval_rel_size,
         k=1,
         stratify_by=stratify_by,
-        max_numeric_cardinality=max_numeric_cardinality,
+        max_numeric_cardinality=max_numeric_cardinality if max_numeric_cardinality is not None else 20,
         numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
-        shuffle=shuffle,
-        seed=seed,
-        as_lazy=False,
-        as_dict=False,
-        validate=validate,
-        rel_size_deviation_tolerance=rel_size_deviation_tolerance,
+        shuffle=shuffle if shuffle is not None else True,
+        seed=seed if seed is not None else 173,
+        validate=validate if validate is not None else True,
+        rel_size_deviation_tolerance=rel_size_deviation_tolerance if rel_size_deviation_tolerance is not None else 0.1,
     )
 
-    assert isinstance(df_train, DataFrame) and isinstance(df_eval, DataFrame)
+    assert len(folds) == 1, "Expected exactly one fold for train/eval split."
+
+    df_train, df_eval = folds[0]["train"], folds[0]["eval"]
     return df_train, df_eval
 
 
