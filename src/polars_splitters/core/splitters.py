@@ -28,8 +28,7 @@ def _split_into_k_train_eval_folds(
     numeric_high_cardinal_qbins: int | dict[str, int] = 10,
     shuffle: bool = True,
     seed: int = 173,
-    validate: bool = True,
-    rel_size_deviation_tolerance: float = 0.1,
+    rel_size_deviation_tolerance: float | None = 0.1,
 ) -> list[TrainEvalDict]:
     """
     Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns.
@@ -102,7 +101,7 @@ def _split_into_k_train_eval_folds(
 
         folds.append({"train": df_train, "eval": df_eval})
 
-    if validate:
+    if rel_size_deviation_tolerance:
         validate_splitting(
             folds=folds,
             df=df,
@@ -123,7 +122,6 @@ def split_into_k_folds(
     numeric_high_cardinal_qbins: int | dict[str, int] = 5,
     shuffle: bool | None = True,
     seed: int | None = 173,
-    validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> list[LazyTrainEvalTuple] | list[TrainEvalTuple] | list[LazyTrainEvalDict] | list[TrainEvalDict]:
     """Split a DataFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
@@ -136,7 +134,6 @@ def split_into_k_folds(
         numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
         shuffle=shuffle if shuffle is not None else True,
         seed=seed if seed is not None else 173,
-        validate=validate if validate is not None else True,
         rel_size_deviation_tolerance=rel_size_deviation_tolerance if rel_size_deviation_tolerance is not None else 0.1,
     )
 
@@ -149,7 +146,6 @@ def split_into_train_eval(
     numeric_high_cardinal_qbins: int | dict[str, int] = 5,
     shuffle: bool | None = True,
     seed: int | None = 173,
-    validate: bool | None = True,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> TrainEvalTuple:
     r"""
@@ -172,10 +168,9 @@ def split_into_train_eval(
         Whether to shuffle rows before splitting. Defaults to True.
     seed : int, optional
         Random seed for shuffling. Defaults to 173.
-    validate : bool, optional
-        Whether to validate inputs and outputs. Defaults to True.
     rel_size_deviation_tolerance : float, optional
         Maximum allowed absolute deviation between actual and requested eval set size. Defaults to 0.1.
+        If None, no validation is performed.
 
     Returns
     -------
@@ -201,10 +196,24 @@ def split_into_train_eval(
     ...     }
     ... )
     >>> df_train, df_eval = split_into_train_eval(
-    ...     df, eval_rel_size=0.3, stratify_by=["treatment", "outcome"], shuffle=True
+    ...     df, eval_rel_size=0.4, stratify_by=["treatment", "outcome"], shuffle=True
     ... )
     >>> print(df_train, df_eval, sep="\n\n")
-    shape: (7, 3)
+    shape: (6, 3)
+    ┌───────────┬───────────┬─────────┐
+    │ feature_1 ┆ treatment ┆ outcome │
+    │ ---       ┆ ---       ┆ ---     │
+    │ f64       ┆ i64       ┆ i64     │
+    ╞═══════════╪═══════════╪═════════╡
+    │ 2.0       ┆ 0         ┆ 0       │
+    │ 4.0       ┆ 0         ┆ 0       │
+    │ 5.0       ┆ 0         ┆ 0       │
+    │ 6.0       ┆ 1         ┆ 0       │
+    │ 7.0       ┆ 1         ┆ 0       │
+    │ 9.0       ┆ 1         ┆ 1       │
+    └───────────┴───────────┴─────────┘
+
+    shape: (4, 3)
     ┌───────────┬───────────┬─────────┐
     │ feature_1 ┆ treatment ┆ outcome │
     │ ---       ┆ ---       ┆ ---     │
@@ -212,21 +221,7 @@ def split_into_train_eval(
     ╞═══════════╪═══════════╪═════════╡
     │ 1.0       ┆ 0         ┆ 0       │
     │ 3.0       ┆ 0         ┆ 0       │
-    │ 4.0       ┆ 0         ┆ 0       │
-    │ 5.0       ┆ 0         ┆ 0       │
-    │ 7.0       ┆ 1         ┆ 0       │
     │ 8.0       ┆ 1         ┆ 0       │
-    │ 9.0       ┆ 1         ┆ 1       │
-    └───────────┴───────────┴─────────┘
-
-    shape: (3, 3)
-    ┌───────────┬───────────┬─────────┐
-    │ feature_1 ┆ treatment ┆ outcome │
-    │ ---       ┆ ---       ┆ ---     │
-    │ f64       ┆ i64       ┆ i64     │
-    ╞═══════════╪═══════════╪═════════╡
-    │ 2.0       ┆ 0         ┆ 0       │
-    │ 6.0       ┆ 1         ┆ 0       │
     │ 10.0      ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
     """
@@ -239,7 +234,6 @@ def split_into_train_eval(
         numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
         shuffle=shuffle if shuffle is not None else True,
         seed=seed if seed is not None else 173,
-        validate=validate if validate is not None else True,
         rel_size_deviation_tolerance=rel_size_deviation_tolerance if rel_size_deviation_tolerance is not None else 0.1,
     )
 
@@ -276,7 +270,6 @@ def sample(
     fraction_rel_tolerance : float, optional. Defaults to 0.1.
         Sets the maximum allowed abs(fraction_actual - fraction_size).
         When stratifying, the fraction_actual might deviate from the targeted fraction_size due to the fact that strata for the given data may not be perfectly divisible at the desired proportion (eval_rel_size * df.height is not integer).
-        If validate is set to False, this parameter is ignored.
     seed : int, optional. Defaults to 173.
         The random seed to use in shuffling.
 
