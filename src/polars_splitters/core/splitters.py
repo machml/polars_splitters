@@ -148,8 +148,7 @@ def split_into_train_eval(
     seed: int | None = 173,
     rel_size_deviation_tolerance: float | None = 0.1,
 ) -> TrainEvalTuple:
-    r"""
-    Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
+    r"""Split a dataset into non-overlapping train and eval sets, optionally stratifying by a column or list of columns.
     Includes logging and guardrails: type coercion and validation for inputs and outputs.
 
     Parameters
@@ -198,7 +197,7 @@ def split_into_train_eval(
     >>> df_train, df_eval = split_into_train_eval(
     ...     df, eval_rel_size=0.4, stratify_by=["treatment", "outcome"], shuffle=True
     ... )
-    >>> print(df_train, df_eval, sep="\n\n")
+    >>> print(df_train, df_eval, sep="\n")
     shape: (6, 3)
     ┌───────────┬───────────┬─────────┐
     │ feature_1 ┆ treatment ┆ outcome │
@@ -212,7 +211,6 @@ def split_into_train_eval(
     │ 7.0       ┆ 1         ┆ 0       │
     │ 9.0       ┆ 1         ┆ 1       │
     └───────────┴───────────┴─────────┘
-
     shape: (4, 3)
     ┌───────────┬───────────┬─────────┐
     │ feature_1 ┆ treatment ┆ outcome │
