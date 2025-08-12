@@ -3,7 +3,8 @@ from polars import DataFrame, Int64, LazyFrame, col, int_range
 from polars import len as pl_len
 from polars import selectors as cs
 
-from polars_splitters.utils.guardrails import enforce_input_outputs_expected_types, validate_splitting
+from polars_splitters.utils.guardrails import (
+    enforce_input_outputs_expected_types, validate_splitting)
 
 df_pl = DataFrame | LazyFrame
 
@@ -17,36 +18,6 @@ TrainEvalTuple = tuple[DataFrame, DataFrame]
 TrainEvalDict = dict[str, DataFrame]
 LazyTrainEvalTuple = tuple[LazyFrame, LazyFrame]
 LazyTrainEvalDict = dict[str, LazyFrame]
-
-
-def split_into_k_folds(
-    df: LazyFrame | DataFrame,
-    k: int | None = 1,
-    stratify_by: str | list[str] | None = None,
-    max_numeric_cardinality: int | None = 20,
-    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
-    shuffle: bool | None = True,
-    seed: int | None = 173,
-    as_lazy: bool | None = False,
-    as_dict: bool | None = False,
-    validate: bool | None = True,
-    rel_size_deviation_tolerance: float | None = 0.1,
-) -> list[LazyTrainEvalTuple] | list[TrainEvalTuple] | list[LazyTrainEvalDict] | list[TrainEvalDict]:
-    """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
-    return _split_into_k_train_eval_folds(
-        df=df,
-        eval_rel_size=None,
-        k=k,
-        stratify_by=stratify_by,
-        max_numeric_cardinality=max_numeric_cardinality,
-        numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
-        shuffle=shuffle,
-        seed=seed,
-        as_lazy=as_lazy,
-        as_dict=as_dict,
-        validate=validate,
-        rel_size_deviation_tolerance=rel_size_deviation_tolerance,
-    )
 
 
 @logger.catch
@@ -130,6 +101,36 @@ def _split_into_k_train_eval_folds(
         folds.append({"train": df_train, "eval": df_eval})
 
     return folds
+
+
+def split_into_k_folds(
+    df: LazyFrame | DataFrame,
+    k: int | None = 1,
+    stratify_by: str | list[str] | None = None,
+    max_numeric_cardinality: int | None = 20,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
+    shuffle: bool | None = True,
+    seed: int | None = 173,
+    as_lazy: bool | None = False,
+    as_dict: bool | None = False,
+    validate: bool | None = True,
+    rel_size_deviation_tolerance: float | None = 0.1,
+) -> list[LazyTrainEvalTuple] | list[TrainEvalTuple] | list[LazyTrainEvalDict] | list[TrainEvalDict]:
+    """Split a DataFrame or LazyFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
+    return _split_into_k_train_eval_folds(
+        df=df,
+        eval_rel_size=None,
+        k=k,
+        stratify_by=stratify_by,
+        max_numeric_cardinality=max_numeric_cardinality,
+        numeric_high_cardinal_qbins=numeric_high_cardinal_qbins,
+        shuffle=shuffle,
+        seed=seed,
+        as_lazy=as_lazy,
+        as_dict=as_dict,
+        validate=validate,
+        rel_size_deviation_tolerance=rel_size_deviation_tolerance,
+    )
 
 
 def split_into_train_eval(
