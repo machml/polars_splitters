@@ -1,8 +1,7 @@
 from collections.abc import Callable
 from functools import wraps
 
-from loguru import logger
-from polars import Int64, LazyFrame
+from polars import DataFrame, Int64
 from polars import len as pl_len
 
 from polars_splitters.utils.wrapping_helpers import get_arg_value, replace_arg_value
@@ -34,10 +33,6 @@ def _get_eval_sizing_measure(k: int) -> str:
         raise ValueError(error_message)
 
 
-def get_lazyframe_size(df: LazyFrame) -> int:
-    return df.select(pl_len()).collect().item()
-
-
 def validate_var_within_bounds(
     var: float,
     bounds: tuple[float | int | None, float | int | None],
@@ -56,129 +51,63 @@ def validate_var_within_bounds(
             raise ValueError(f"var must be less than {bounds[1]}, got {var}")
 
 
-def validate_splitting(func: Callable) -> Callable:
-    @wraps(func)
-    def wrapper(*args, **kwargs) -> Exception | None:
-        validate = get_arg_value(
-            args,
-            kwargs,
-            "validate",
-            arg_index=5,
-            default=True,
-            expected_type=bool,
-        )
-        if validate:
-            # load arguments: args[0] stores theo func, the actual args start at index 1
-            df = get_arg_value(args, kwargs, "df", arg_index=0, expected_type=LazyFrame)
-            eval_rel_size = get_arg_value(
-                args,
-                kwargs,
-                "eval_rel_size",
-                arg_index=1,
-                expected_type=float,
-            )
-            k = get_arg_value(args, kwargs, "k", arg_index=2, expected_type=int)
-            stratify_by = get_arg_value(
-                args,
-                kwargs,
-                "stratify_by",
-                arg_index=3,
-                expected_type=list,
-                warn_on_recast=False,
-            )
+def validate_splitting(
+    folds: list[dict[str, DataFrame]],
+    df: DataFrame,
+    eval_rel_size: float,
+    k: int,
+    stratify_by: list[str] | None,
+    rel_size_deviation_tolerance: float,
+) -> None:
+    """
+    Validate the output folds for train/eval splitting.
+    Checks that the actual relative size of the eval set is within tolerance of the requested size,
+    and that stratification is feasible if requested.
+    """
+    if k > 1:
+        eval_rel_size_ = 1 / k
+    else:
+        eval_rel_size_ = eval_rel_size
 
-            # validate
-            if k == 1 and eval_rel_size is None:
-                raise ValueError(
-                    f"Must specify either k>1 or eval_rel_size, got k={k} and eval_rel_size={eval_rel_size}.",
-                )
-            if k > 1 and eval_rel_size is not None:
-                raise ValueError(
-                    f"Cannot specify both k > 1 and eval_rel_size, got k={k} and eval_rel_size={eval_rel_size}.",
-                )
-            if k > 1:
-                validate_var_within_bounds(k, (1, None))
-                eval_rel_size_ = 1 / k
-                if not isinstance(k, int):
-                    raise TypeError(f"k must be of type int, got {type(k)}")
+    input_height = df.height
 
-            elif eval_rel_size is not None:
-                validate_var_within_bounds(eval_rel_size, (0.0, 1.0))
-                if not isinstance(eval_rel_size, float):
-                    raise TypeError(
-                        f"eval_rel_size must be of type float, got {type(eval_rel_size)}",
-                    )
+    if stratify_by:
+        # validate stratification feasibility (size_input, eval_rel_size (or k), n_strata, stratify_by)
+        n_strata = df.select(stratify_by).n_unique()
+        eval_size_targeted = df.select(
+            (eval_rel_size_ * pl_len()).round(0).clip(lower_bound=1).cast(Int64),
+        ).item()
+        if eval_rel_size_ <= 0.5:
+            smallest_set_size = eval_size_targeted
+        else:
+            smallest_set_size = input_height - eval_size_targeted
+        if smallest_set_size < n_strata:
+            raise ValueError(
+                f"""
+                Unable to generate the data splits for the data df and the configuration attempted for {_get_eval_sizing_measure(k)} and stratify_by.
+                For the stratification to work, the size of the smallest set (currently {smallest_set_size})
+                must be at least as large as the number of strata (currently {n_strata}), i.e. the number of unique row-wise
+                combinations of values in the stratify_by columns (currently {stratify_by}).
 
-                eval_rel_size_ = eval_rel_size
-
-            input_size = get_lazyframe_size(df)
-
-            if stratify_by:
-                # validate stratification feasibility (size_input, eval_rel_size (or k), n_strata, stratify_by)
-                n_strata = df.select(stratify_by).collect().n_unique()
-
-                eval_size_targeted = (
-                    df.select(
-                        (eval_rel_size_ * pl_len()).round(0).clip(lower_bound=1).cast(Int64),
-                    )
-                    .collect()
-                    .item()
-                )
-
-                if eval_rel_size_ <= 0.5:
-                    smallest_set, smallest_set_size = ("eval", eval_size_targeted)
-                else:
-                    smallest_set, smallest_set_size = (
-                        "train",
-                        input_size - eval_size_targeted,
-                    )
-
-                if smallest_set_size < n_strata:
-                    f"""
-                    Unable to generate the data splits for the data df and the configuration attempted for {_get_eval_sizing_measure(k)} and stratify_by.
-                    For the stratification to work, the size of the smallest set (currently {smallest_set}: {smallest_set_size})
-                    must be at least as large as the number of strata (currently {n_strata}), i.e. the number of unique row-wise
-                    combinations of values in the stratify_by columns (currently {stratify_by}).
-
-                    {_get_suggestion_for_loosening_stratification(k)}
-                    """
-
-        folds = func(*args, **kwargs)
-
-        if validate:
-            rel_size_deviation_tolerance = get_arg_value(
-                args,
-                kwargs,
-                "rel_size_deviation_tolerance",
-                arg_index=9,
-                default=0.1,
-                expected_type=float,
+                {_get_suggestion_for_loosening_stratification(k)}
+                """,
             )
 
-            for i, fold in enumerate(folds):
-                df_eval = fold["eval"]
+    # Validate output folds
+    for fold in folds:
+        df_eval = fold["eval"]
+        eval_rel_size_actual = df_eval.height / input_height
+        rel_size_deviation = abs(eval_rel_size_actual - eval_rel_size_)
+        if rel_size_deviation > rel_size_deviation_tolerance + 1e-6:
+            raise ValueError(
+                f"""
+                The actual relative size of the eval set ({eval_rel_size_actual}) deviates from the requested relative size ({eval_rel_size_})
+                by more than the specified tolerance ({rel_size_deviation_tolerance}).
 
-                eval_rel_size_actual = get_lazyframe_size(df_eval) / input_size
-
-                rel_size_deviation = abs(eval_rel_size_actual - eval_rel_size_)
-
-                logger.info(
-                    f"fold {i + 1}/{k}, k: {k}, eval_rel_size: {eval_rel_size_}, eval_rel_size_actual: {eval_rel_size_actual}, rel_size_deviation_tolerance: {rel_size_deviation_tolerance}, rel_size_deviation: {rel_size_deviation}",
-                )
-
-                if rel_size_deviation > rel_size_deviation_tolerance + 1e-6:
-                    raise ValueError(
-                        f"""
-                            The actual relative size of the eval set ({eval_rel_size_actual}) deviates from the requested relative size ({eval_rel_size_})
-                            by more than the specified tolerance ({rel_size_deviation_tolerance}).
-
-                            {_get_suggestion_for_loosening_stratification(k)}
-                            """,
-                    )
-
-        return folds
-
-    return wrapper
+                {_get_suggestion_for_loosening_stratification(k)}
+                """,
+            )
+    # No return value; raises on error
 
 
 def enforce_input_outputs_expected_types(func: Callable) -> Callable:
@@ -186,13 +115,15 @@ def enforce_input_outputs_expected_types(func: Callable) -> Callable:
 
     @wraps(func)
     def wrapper(*args, **kwargs) -> Exception | None:
-        df = get_arg_value(args, kwargs, "df", arg_index=0, expected_type=LazyFrame)
+        df = get_arg_value(args, kwargs, "df", arg_index=0, expected_type=DataFrame)
+
+        assert isinstance(df, DataFrame), "df must be a pl.DataFrame"
         args, kwargs = replace_arg_value(
             args,
             kwargs,
             "df",
             arg_index=0,
-            new_value=df.lazy(),
+            new_value=df,
         )
 
         k = get_arg_value(args, kwargs, "k", arg_index=2, expected_type=int)
@@ -217,7 +148,7 @@ def enforce_input_outputs_expected_types(func: Callable) -> Callable:
         )
 
         if not as_lazy:
-            folds = [{subset_name: df.collect() for subset_name, df in fold.items()} for fold in folds]
+            folds = [{subset_name: df for subset_name, df in fold.items()} for fold in folds]
         if not as_dict:
             folds = [tuple(fold.values()) for fold in folds]
         if k == 1:
@@ -225,4 +156,5 @@ def enforce_input_outputs_expected_types(func: Callable) -> Callable:
 
         return folds
 
+    return wrapper
     return wrapper

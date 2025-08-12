@@ -18,7 +18,7 @@ pip install polars-splitters
 
 ```python
 import polars as pl
-from polars_splitters import split_into_train_eval, split_into_k_folds
+from polars_splitters import split_into_train_eval, split_into_k_folds, sample
 
 df = pl.DataFrame(
     {
@@ -28,27 +28,45 @@ df = pl.DataFrame(
     }
 )
 
+# Split into train and eval
 df_train, df_test = split_into_train_eval(
     df,
-    eval_rel_size=0.3,
+    eval_rel_size=0.4,
     stratify_by=["treatment", "outcome"],
-    shuffle=True,
-    validate=True,
-    as_lazy=False,
-    rel_size_deviation_tolerance=0.1,
+    shuffle=False,
 )
+print(df_train, df_test)
 
+# Split into k folds
 folds = split_into_k_folds(
     df,
     k=3,
     stratify_by=["treatment", "outcome"],
     shuffle=False,
-    as_lazy=False
 )
 
+# e.g. get the pair df_train, df_eval for the first fold
+df_train, df_val = folds[0]["train"], folds[0]["eval"]
+print(df_train, df_val)
+
+# Stratified sample
 df_sample = sample(
     df,
     fraction=0.5,
     stratify_by=["treatment", "outcome"],
 )
+
+print(df_sample)
 ```
+
+## current limitations
+
+- only supports polars eager API (pl.DataFrame): no pl.LazyFrame
+
+## future work
+
+- [test] add unit tests for sample()
+
+- [test] add tests for handling ties
+
+- [feat] implement handling of ties

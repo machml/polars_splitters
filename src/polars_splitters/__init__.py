@@ -1,1 +1,1 @@
-from .core.splitters import *
+from .core.splitters import *  # noqa: F403
