@@ -14,8 +14,11 @@ dependencies = [
 dev = [
     "ipykernel>=6.29.5",
     "pytest==8.2.2",
+    "pytest-cov",
     "pytest-check==2.5.*",
     "ruff>=0.12.8",
+    "mdformat>=0.7.22",
+    "mktestdocs>=0.2.5",
 ]
 
 [tool.ruff]
