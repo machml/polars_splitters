@@ -4,8 +4,7 @@ from functools import wraps
 from polars import DataFrame, Int64
 from polars import len as pl_len
 
-from polars_splitters.utils.wrapping_helpers import (get_arg_value,
-                                                     replace_arg_value)
+from polars_splitters.utils.wrapping_helpers import get_arg_value, replace_arg_value
 
 
 def _get_suggestion_for_loosening_stratification(k: int) -> str:
@@ -75,11 +74,9 @@ def validate_splitting(
     if stratify_by:
         # validate stratification feasibility (size_input, eval_rel_size (or k), n_strata, stratify_by)
         n_strata = df.select(stratify_by).n_unique()
-        eval_size_targeted = (
-            df.select(
-                (eval_rel_size_ * pl_len()).round(0).clip(lower_bound=1).cast(Int64),
-            ).item()
-        )
+        eval_size_targeted = df.select(
+            (eval_rel_size_ * pl_len()).round(0).clip(lower_bound=1).cast(Int64),
+        ).item()
         if eval_rel_size_ <= 0.5:
             smallest_set_size = eval_size_targeted
         else:
@@ -97,7 +94,7 @@ def validate_splitting(
             )
 
     # Validate output folds
-    for i, fold in enumerate(folds):
+    for fold in folds:
         df_eval = fold["eval"]
         eval_rel_size_actual = df_eval.height / input_height
         rel_size_deviation = abs(eval_rel_size_actual - eval_rel_size_)
@@ -159,4 +156,5 @@ def enforce_input_outputs_expected_types(func: Callable) -> Callable:
 
         return folds
 
+    return wrapper
     return wrapper

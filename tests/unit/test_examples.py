@@ -1,9 +1,24 @@
+from pathlib import Path
+
 import polars as pl
+from mktestdocs import check_md_file
 from polars.testing import assert_frame_equal
 
 from polars_splitters import sample, split_into_k_folds, split_into_train_eval
 
 
+def test_readme_examples():
+    """Test that all Python code examples in README.md execute successfully."""
+    fpath = Path(".") / "README.md"
+    check_md_file(fpath=fpath, lang="python")
+
+
+def test_docs_examples():
+    """Test any other markdown files with Python examples."""
+    docs_dir = Path(".") / "docs"
+    if docs_dir.exists():
+        for md_file in docs_dir.glob("*.md"):
+            check_md_file(fpath=md_file, lang="python")
 class TestQuickstartExamples:
     def setup_method(self):
         self.df = pl.DataFrame(
@@ -41,12 +56,10 @@ class TestQuickstartExamples:
             assert isinstance(fold, dict)
             assert isinstance(fold["train"], pl.DataFrame)
             assert isinstance(fold["eval"], pl.DataFrame)
-        #assert sum(fold["train"]) + len(fold["eval"]) for fold in folds) == len(self.df)
+        # assert sum(fold["train"]) + len(fold["eval"]) for fold in folds) == len(self.df)
 
     def test_sample(self):
-        df_sample = sample(
-            self.df, fraction=0.5, stratify_by=["treatment", "outcome"]
-        )
+        df_sample = sample(self.df, fraction=0.5, stratify_by=["treatment", "outcome"])
         assert isinstance(df_sample, pl.DataFrame)
         assert 0 < len(df_sample) < len(self.df)
 

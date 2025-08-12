@@ -4,10 +4,10 @@ import pytest
 from polars import DataFrame, concat
 from pytest_check import check
 
-from polars_splitters.core.splitters import (split_into_k_folds,
-                                             split_into_train_eval)
+from polars_splitters.core.splitters import split_into_k_folds, split_into_train_eval
 
 SEED = 173
+
 
 class TestSplitIntoTrainEval:
     @pytest.mark.parametrize("eval_rel_size, expected_eval_size", [(0.3, 3), (0.4, 4)])
@@ -247,5 +247,3 @@ class TestSplitIntoKFolds:
                 )
                 check.equal(Counter(df_train["treatment"]), Counter({0: 134, 1: 134}))
                 check.equal(Counter(df_eval["treatment"]), Counter({0: 66, 1: 66}))
-
-

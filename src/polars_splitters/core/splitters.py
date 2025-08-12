@@ -42,7 +42,9 @@ def _split_into_k_train_eval_folds(
     if shuffle:
         idxs = idxs.shuffle(seed=seed)
 
-    assert (eval_rel_size is None) or (k == 1), "eval_rel_size must be either explicitly specified or implicitly via k, not both."
+    assert (eval_rel_size is None) or (k == 1), (
+        "eval_rel_size must be either explicitly specified or implicitly via k, not both."
+    )
     if k > 1:  # k-fold
         eval_rel_size = 1 / k
 
@@ -101,7 +103,14 @@ def _split_into_k_train_eval_folds(
         folds.append({"train": df_train, "eval": df_eval})
 
     if validate:
-        validate_splitting(folds=folds, df=df, k=k, stratify_by=stratify_by, eval_rel_size=eval_rel_size, rel_size_deviation_tolerance=rel_size_deviation_tolerance)
+        validate_splitting(
+            folds=folds,
+            df=df,
+            k=k,
+            stratify_by=stratify_by,
+            eval_rel_size=eval_rel_size,
+            rel_size_deviation_tolerance=rel_size_deviation_tolerance,
+        )
 
     return folds
 
