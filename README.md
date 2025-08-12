@@ -1,6 +1,19 @@
 # polars-splitters
 
-Polars-based splitter functionalities for polars LazyFrames and DataFrames similar to `sklearn.model_selection.train_test_split` and `sklearn.model_selection.StratifiedKFold`.
+<p align="center">
+ <em>stratified splitting of polars dataframes</em>
+</p>
+<p align="center">
+<a href="https://github.com/machml/polars-splitters/actions" target="_blank">
+<img src="https://github.com/machml/polars_splitters/actions/workflows/test.yml/badge.svg" alt="Tests">
+</a>
+<img src="https://img.shields.io/pypi/v/polars-splitters?color=%2334D058&label=pypi%20package" alt="Package version">
+<a href="https://pypi.org/project/polars-splitters" target="_blank">
+<img src="https://img.shields.io/pypi/pyversions/polars-splitters.svg?color=%2334D058" alt="Supported Python versions">
+</a>
+</p>
+
+Polars-based splitter functionalities for polars DataFrames similar to sklearn.model_selection.train_test_split and sklearn.model_selection.StratifiedKFold.
 
 ## features
 
@@ -10,7 +23,7 @@ Polars-based splitter functionalities for polars LazyFrames and DataFrames simil
 
 ## installation
 
-```bash
+```shell
 pip install polars-splitters
 ```
 
@@ -65,8 +78,4 @@ print(df_sample)
 
 ## future work
 
-- [test] add unit tests for sample()
-
-- [test] add tests for handling ties
-
-- [feat] implement handling of ties
+- improve resilience against ties in quantized float columns in stratify_by
