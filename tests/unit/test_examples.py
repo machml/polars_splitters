@@ -19,6 +19,8 @@ def test_docs_examples():
     if docs_dir.exists():
         for md_file in docs_dir.glob("*.md"):
             check_md_file(fpath=md_file, lang="python")
+
+
 class TestQuickstartExamples:
     def setup_method(self):
         self.df = pl.DataFrame(
