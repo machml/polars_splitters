@@ -108,7 +108,7 @@ def split_into_k_folds(
     k: int | None = 1,
     stratify_by: str | list[str] | None = None,
     max_numeric_cardinality: int | None = 20,
-    numeric_high_cardinal_qbins: int | dict[str, int] = 10,
+    numeric_high_cardinal_qbins: int | dict[str, int] = 5,
     shuffle: bool | None = True,
     seed: int | None = 173,
     as_lazy: bool | None = False,
