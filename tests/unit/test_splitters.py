@@ -4,7 +4,8 @@ import pytest
 from polars import DataFrame, concat
 from pytest_check import check
 
-from polars_splitters.core.splitters import split_into_k_folds, split_into_train_eval
+from polars_splitters.core.splitters import (split_into_k_folds,
+                                             split_into_train_eval)
 
 SEED = 173
 
@@ -16,7 +17,6 @@ class TestSplitIntoTrainEval:
         [None, "treatment", ["treatment", "outcome"]],
     )
     @pytest.mark.parametrize("shuffle", [False, True])
-    @pytest.mark.parametrize("validate", [False, True])
     def test_output_types_e_sizes_inputting_basic_df(
         self,
         df_basic,
@@ -24,7 +24,6 @@ class TestSplitIntoTrainEval:
         expected_eval_size,
         stratify_by,
         shuffle,
-        validate,
     ):
         df_train, df_eval = split_into_train_eval(
             df=df_basic(),
@@ -32,7 +31,6 @@ class TestSplitIntoTrainEval:
             stratify_by=stratify_by,
             shuffle=shuffle,
             seed=SEED,
-            validate=validate,
             rel_size_deviation_tolerance=0.1,
         )
         check.is_instance(df_train, DataFrame)
@@ -67,7 +65,6 @@ class TestSplitIntoTrainEval:
             stratify_by=stratify_by,
             shuffle=shuffle,
             seed=SEED,
-            validate=True,
             rel_size_deviation_tolerance=0.1,
         )
         expected_eval_size = int(n_input * eval_rel_size)
@@ -85,7 +82,6 @@ class TestSplitIntoTrainEval:
             stratify_by=stratify_by,
             shuffle=False,
             seed=SEED,
-            validate=True,
             rel_size_deviation_tolerance=0.1,
         )
         if stratify_by is None:
@@ -117,7 +113,6 @@ class TestSplitIntoTrainEval:
             stratify_by=stratify_by,
             shuffle=False,
             seed=SEED,
-            validate=True,
             rel_size_deviation_tolerance=0.1,
         )
         if stratify_by is None:
@@ -170,7 +165,6 @@ class TestSplitIntoKFolds:
             stratify_by=stratify_by,
             shuffle=shuffle,
             seed=SEED,
-            validate=True,
             rel_size_deviation_tolerance=rel_size_deviation_tolerance,
         )
         check.is_instance(folds, list)
@@ -216,7 +210,6 @@ class TestSplitIntoKFolds:
             stratify_by=stratify_by,
             shuffle=False,
             seed=SEED,
-            validate=True,
             rel_size_deviation_tolerance=0.1,
         )
         for k, fold in enumerate(folds):
@@ -246,4 +239,7 @@ class TestSplitIntoKFolds:
                     Counter({(0, 0): 33, (0, 1): 33, (1, 0): 33, (1, 1): 33}),
                 )
                 check.equal(Counter(df_train["treatment"]), Counter({0: 134, 1: 134}))
+                check.equal(Counter(df_eval["treatment"]), Counter({0: 66, 1: 66}))
+                check.equal(Counter(df_eval["treatment"]), Counter({0: 66, 1: 66}))
+                check.equal(Counter(df_eval["treatment"]), Counter({0: 66, 1: 66}))
                 check.equal(Counter(df_eval["treatment"]), Counter({0: 66, 1: 66}))
