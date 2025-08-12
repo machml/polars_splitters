@@ -76,12 +76,18 @@ jobs:
     - name: Test README examples
       if: matrix.python-version == '3.12' && !matrix.polars-constraint
       run: |
-        uv run --python ${{ matrix.python-version }} python -m mktestdocs README.mdℹ️  No Python code blocks found in README')
+        uv run --python ${{ matrix.python-version }} python -c "
+        from pathlib import Path
+        from mktestdocs import check_md_file
+
+        fpath = Path('.') / 'README.md'
+        check_md_file(fpath=fpath, lang='python')
+        print('✅ README examples tested successfully')
         "
 
     - name: Upload coverage to Codecov
       if: matrix.python-version == '3.12' && !matrix.polars-constraint
-      uses: codecov/codecov-action@v5.2.1
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
