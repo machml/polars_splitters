@@ -123,7 +123,7 @@ def split_into_k_folds(
     shuffle: bool | None = True,
     seed: int | None = 173,
     rel_size_deviation_tolerance: float | None = 0.1,
-) -> list[LazyTrainEvalTuple] | list[TrainEvalTuple] | list[LazyTrainEvalDict] | list[TrainEvalDict]:
+) -> list[TrainEvalDict]:
     """Split a DataFrame into k non-overlapping folds, allowing for stratification by a column or list of columns."""
     return _split_into_k_train_eval_folds(
         df=df,
