@@ -1,6 +1,6 @@
 [project]
 name = "polars-splitters"
-version = "0.4.4"
+version = "0.4.5"
 description = "Polars-based splitter functionalities for polars LazyFrames and DataFrames, similar to `sklearn.model_selection.train_test_split` and `sklearn.model_selection.StratifiedKFold`."
 authors = [{ name = "Jonas M. Miguel", email = "charter-shushes0n@icloud.com" }]
 readme = "README.md"
